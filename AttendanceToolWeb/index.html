@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Rollcall | Classroom Attendance</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+	<script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+	<style>
+		:root { --ink:#2a1a20; --muted:#716a6d; --line:#e4dfe0; --paper:#fbfaf8; --sage:#f5e9ed; --mint:#ffc627; --green:#8c1d40; --orange:#a15c00; --shadow:0 24px 70px rgba(54,23,35,.11); }
+		* { box-sizing:border-box; }
+		body { margin:0; min-height:100vh; color:var(--ink); background:var(--paper); font-family:Manrope, sans-serif; }
+		button, input, select { font:inherit; }
+		button { cursor:pointer; }
+		.shell { max-width:1320px; margin:auto; padding:26px 38px 48px; }
+		.topbar { display:flex; align-items:center; justify-content:space-between; padding-bottom:28px; border-bottom:1px solid var(--line); }
+		.brand { display:flex; align-items:center; gap:12px; font-weight:800; letter-spacing:-.04em; font-size:21px; }
+		.brand-mark { width:35px; height:35px; display:grid; place-items:center; color:white; background:var(--ink); border-radius:10px; }
+		.brand-mark i { width:18px; height:18px; }
+		.top-note { color:var(--muted); font-size:12px; font-family:'DM Mono', monospace; letter-spacing:.02em; }
+		.hero { display:flex; justify-content:space-between; align-items:end; gap:24px; padding:46px 0 34px; }
+		.eyebrow { color:var(--green); font:500 11px 'DM Mono', monospace; text-transform:uppercase; letter-spacing:.12em; }
+		h1 { margin:11px 0 0; font-size:clamp(38px,5vw,68px); line-height:.98; letter-spacing:-.065em; max-width:700px; }
+		.hero-copy { color:var(--muted); max-width:430px; font-size:14px; line-height:1.7; margin:0 0 4px; }
+		.tabs { display:flex; gap:8px; padding:6px; margin-bottom:22px; width:max-content; background:#f3ecee; border-radius:14px; }
+		.tab { border:0; color:var(--muted); background:transparent; padding:11px 18px; border-radius:10px; font-size:13px; font-weight:700; }
+		.tab.active { color:var(--ink); background:white; box-shadow:0 3px 12px rgba(24,48,43,.08); }
+		.view { display:none; animation:rise .35s ease both; }
+		.view.active { display:block; }
+		.grid { display:grid; grid-template-columns:minmax(300px,.82fr) minmax(450px,1.35fr); gap:20px; align-items:stretch; }
+		.panel { background:white; border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); }
+		.panel-pad { padding:28px; }
+		.panel-head { display:flex; justify-content:space-between; align-items:flex-start; gap:15px; padding:25px 28px 18px; border-bottom:1px solid var(--line); }
+		.panel-title { margin:0; font-size:15px; letter-spacing:-.02em; }
+		.panel-sub { margin:5px 0 0; font-size:12px; color:var(--muted); }
+		.session-card { background:var(--ink); color:white; position:relative; overflow:hidden; }
+		.session-card:after { content:''; position:absolute; width:220px; height:220px; border:1px solid rgba(255,198,39,.25); border-radius:50%; right:-95px; bottom:-115px; }
+		.session-card .eyebrow { color:#ffd75a; }
+		.session-card h2 { font-size:28px; letter-spacing:-.06em; margin:13px 0 26px; }
+		.field-label { display:block; color:var(--muted); font:500 10px 'DM Mono', monospace; text-transform:uppercase; letter-spacing:.12em; margin-bottom:9px; }
+		.session-card .field-label { color:#c7aab5; }
+		.input, select { width:100%; border:1px solid var(--line); border-radius:9px; background:#fff; color:var(--ink); padding:12px 13px; outline:none; }
+		.input:focus, select:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(140,29,64,.11); }
+		.session-card .input, .session-card select { color:white; background:#4a2232; border-color:#7a4b5d; }
+		.form-row { display:grid; grid-template-columns:1.4fr .8fr; gap:12px; }
+		.form-group { margin-bottom:17px; }
+		.primary, .secondary, .danger { border:0; border-radius:9px; padding:13px 16px; font-size:12px; font-weight:800; transition:transform .15s, filter .15s; }
+		.primary:hover, .secondary:hover, .danger:hover { transform:translateY(-1px); filter:brightness(1.03); }
+		.primary { color:var(--ink); background:var(--mint); }
+		.secondary { color:var(--ink); background:#f5edef; border:1px solid var(--line); }
+		.danger { color:#9b4d27; background:#fff1eb; }
+		.full { width:100%; }
+		.session-meta { display:grid; grid-template-columns:1fr 1fr; gap:13px; padding:20px 0 22px; margin-top:18px; border-top:1px solid #6a394b; }
+		.session-value { font-size:13px; color:#f7edf0; }
+		.qr-stage { display:grid; place-items:center; padding:26px 0 15px; }
+		#qr { display:block; width:190px; height:190px; padding:12px; background:white; border-radius:13px; }
+		.code { text-align:center; color:#8c1d40; font:500 21px 'DM Mono', monospace; letter-spacing:.14em; }
+		.expires { display:flex; align-items:center; justify-content:center; gap:7px; color:#8e8589; font-size:11px; margin-top:10px; }
+		.expires strong { color:white; font-family:'DM Mono', monospace; }
+		.status { display:inline-flex; align-items:center; gap:7px; font-size:11px; font-weight:700; padding:6px 9px; border-radius:20px; color:var(--green); background:var(--sage); white-space:nowrap; }
+		.status:before { content:''; width:6px; height:6px; border-radius:50%; background:#ffc627; box-shadow:0 0 0 3px #f9e6a7; }
+		.stats { display:grid; grid-template-columns:repeat(3,1fr); border-bottom:1px solid var(--line); }
+		.stat { padding:22px 25px; border-right:1px solid var(--line); }
+		.stat:last-child { border:0; }
+		.stat-number { font-size:26px; font-weight:800; letter-spacing:-.06em; }
+		.stat-name { color:var(--muted); font-size:11px; margin-top:4px; }
+		.table-wrap { overflow-x:auto; }
+		table { width:100%; border-collapse:collapse; font-size:12px; min-width:590px; }
+		th { padding:14px 25px; color:var(--muted); text-align:left; font:500 10px 'DM Mono', monospace; text-transform:uppercase; letter-spacing:.08em; border-bottom:1px solid var(--line); }
+		td { padding:15px 25px; border-bottom:1px solid #edf2ef; white-space:nowrap; }
+		tbody tr:last-child td { border-bottom:0; }
+		.student { display:flex; align-items:center; gap:10px; font-weight:700; }
+		.avatar { display:grid; place-items:center; width:27px; height:27px; border-radius:50%; color:var(--green); background:var(--sage); font-size:10px; }
+		.pill { font-size:10px; font-weight:800; padding:5px 8px; border-radius:20px; }
+		.present { color:var(--green); background:var(--sage); }
+		.flagged { color:#a75b2e; background:#fff0e8; }
+		.table-foot { display:flex; justify-content:space-between; align-items:center; gap:15px; padding:18px 25px; border-top:1px solid var(--line); }
+		.micro { color:var(--muted); font:11px 'DM Mono', monospace; }
+		.checkin-layout { max-width:760px; margin:0 auto; }
+		.checkin-panel { display:grid; grid-template-columns:1fr 1fr; overflow:hidden; }
+		.checkin-intro { color:white; background:var(--ink); padding:44px; }
+		.checkin-intro h2 { margin:13px 0 18px; font-size:35px; letter-spacing:-.07em; line-height:1; }
+		.checkin-intro p { color:#d9c3ca; font-size:13px; line-height:1.7; }
+		.location-note { display:flex; gap:10px; margin-top:46px; padding-top:18px; border-top:1px solid #6a394b; color:#efdde3; font-size:11px; line-height:1.5; }
+		.location-note i { flex:none; width:15px; }
+		.checkin-form { padding:44px; }
+		.checkin-form h3 { margin:0 0 8px; font-size:19px; letter-spacing:-.04em; }
+		.checkin-form .panel-sub { margin-bottom:29px; }
+		.result { display:none; padding:18px; margin-top:18px; border-radius:10px; background:var(--sage); }
+		.result.show { display:block; animation:rise .3s ease both; }
+		.result.flag { background:#fff0e8; }
+		.result h4 { margin:0 0 12px; font-size:15px; }
+		.result-line { display:flex; align-items:center; gap:8px; margin:7px 0; color:#53685e; font-size:11px; }
+		.result-line i { width:14px; color:var(--green); }
+		.result.flag .result-line i { color:var(--orange); }
+		.result-state { margin-top:15px; padding-top:13px; border-top:1px solid rgba(40,120,76,.16); color:var(--green); font:700 11px 'DM Mono', monospace; letter-spacing:.08em; }
+		.result.flag .result-state { color:#a75b2e; border-color:rgba(216,121,61,.2); }
+		.checkin-warning { display:none; margin-top:13px; padding:11px 12px; color:#8c1d40; background:#f5e9ed; border-radius:8px; font-size:11px; line-height:1.5; }
+		.checkin-warning.show { display:block; }
+		.presentation { display:none; position:fixed; inset:0; z-index:10; overflow:auto; color:white; background:var(--ink); }
+		.presentation.open { display:block; animation:rise .3s ease both; }
+		.presentation-inner { min-height:100vh; display:grid; place-items:center; padding:34px; text-align:center; }
+		.presentation-close { position:absolute; top:28px; right:30px; display:flex; align-items:center; gap:8px; color:#e0c7d0; background:transparent; border:1px solid #7a4b5d; border-radius:9px; padding:10px 13px; font-size:11px; }
+		.presentation-eyebrow { color:#ffd75a; font:500 12px 'DM Mono', monospace; letter-spacing:.14em; text-transform:uppercase; }
+		.presentation h2 { margin:14px 0 8px; font-size:clamp(34px,5vw,64px); letter-spacing:-.07em; }
+		.presentation-sub { color:#d9c3ca; margin:0 0 28px; font-size:14px; }
+		.presentation-qr { width:min(46vw,390px); height:min(46vw,390px); padding:22px; background:white; border-radius:18px; }
+		.presentation-code { margin-top:26px; color:#ffd75a; font:500 clamp(27px,4vw,46px) 'DM Mono', monospace; letter-spacing:.17em; }
+		.presentation-expiry { display:flex; justify-content:center; align-items:center; gap:8px; margin-top:12px; color:#d9c3ca; font-size:13px; }
+		.presentation-expiry strong { color:white; font:500 15px 'DM Mono', monospace; }
+		.presentation-hint { margin-top:42px; color:#aa8794; font-size:11px; }
+		.auth-gate { position:fixed; inset:0; z-index:20; display:grid; place-items:center; padding:24px; background:rgba(42,26,32,.94); }
+		.auth-gate.hidden { display:none; }
+		.auth-card { width:min(420px,100%); padding:36px; color:var(--ink); background:white; border-radius:18px; box-shadow:0 30px 100px rgba(0,0,0,.22); }
+		.auth-icon { display:grid; place-items:center; width:42px; height:42px; margin-bottom:24px; color:white; background:var(--ink); border-radius:12px; }
+		.auth-card h2 { margin:0 0 8px; font-size:25px; letter-spacing:-.06em; }
+		.auth-card p { margin:0 0 25px; color:var(--muted); font-size:12px; line-height:1.6; }
+		.auth-error { display:none; margin-top:11px; color:#a75b2e; font-size:11px; }
+		.auth-error.show { display:block; }
+		.roster-modal { position:fixed; inset:0; z-index:15; display:none; place-items:center; padding:24px; background:rgba(24,48,43,.72); }
+		.roster-modal.open { display:grid; animation:rise .25s ease both; }
+		.roster-card { width:min(620px,100%); max-height:min(720px,90vh); overflow:auto; padding:30px; background:white; border-radius:18px; box-shadow:0 30px 100px rgba(0,0,0,.22); }
+		.roster-head { display:flex; justify-content:space-between; align-items:flex-start; gap:15px; margin-bottom:24px; }
+		.roster-head h2 { margin:0 0 6px; font-size:22px; letter-spacing:-.06em; }
+		.close-icon { display:grid; place-items:center; width:32px; height:32px; color:var(--muted); background:#edf4ef; border:0; border-radius:8px; }
+		.roster-help { color:var(--muted); font-size:12px; line-height:1.6; }
+		.roster-textarea { width:100%; min-height:190px; resize:vertical; border:1px solid var(--line); border-radius:9px; padding:13px; color:var(--ink); outline:none; line-height:1.7; }
+		.roster-textarea:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(140,29,64,.11); }
+		.check-option { display:flex; align-items:flex-start; gap:10px; color:var(--ink); font-size:12px; line-height:1.5; }
+		.check-option input { width:16px; height:16px; margin:0; accent-color:var(--green); }
+		.roster-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+		.empty { padding:44px 25px; text-align:center; color:var(--muted); }
+		.empty i { width:25px; height:25px; margin-bottom:8px; }
+		.toast { position:fixed; right:25px; bottom:25px; color:white; background:var(--ink); border-radius:9px; padding:13px 17px; font-size:12px; box-shadow:var(--shadow); transform:translateY(15px); opacity:0; pointer-events:none; transition:.25s; }
+		.toast.show { transform:none; opacity:1; }
+		@keyframes rise { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+		@media (max-width:850px) { .shell { padding:20px 18px 35px; } .hero { display:block; padding:36px 0 27px; } .hero-copy { margin-top:20px; } .grid { grid-template-columns:1fr; } .checkin-panel { grid-template-columns:1fr; } .checkin-intro, .checkin-form { padding:30px; } .location-note { margin-top:30px; } }
+		@media (max-width:520px) { .top-note { display:none; } h1 { font-size:45px; } .tabs { width:100%; } .tab { flex:1; padding:11px 8px; } .stats { grid-template-columns:1fr 1fr; } .stat { padding:16px; } .stat:last-child { grid-column:span 2; border-top:1px solid var(--line); } .panel-head { padding:20px; } }
+	</style>
+</head>
+<body>
+	<main class="shell">
+		<header class="topbar">
+			<div class="brand"><span class="brand-mark"><i data-lucide="scan-line"></i></span> rollcall</div>
+			<div class="top-note">CLASSROOM OPPERATIONS / 2026</div>
+		</header>
+		<section class="hero">
+			<div><div class="eyebrow">Live classroom operations</div><h1>Attendance</em></h1></div>
+			<p class="hero-copy">Classroom check-in for instructors.</p>
+		</section>
+		<nav class="tabs" aria-label="Application view">
+			<button class="tab active" data-view="dashboard">Instructor dashboard</button>
+			<button class="tab" data-view="checkin">Student check-in</button>
+		</nav>
+
+		<section id="dashboard" class="view active">
+			<div class="grid">
+				<article class="panel session-card panel-pad">
+					<div class="eyebrow">New attendance session</div>
+					<h2>Set the room,<br>then start attendance.</h2>
+					<div class="form-group"><label class="field-label" for="class-name">Classroom / course</label><input class="input" id="class-name" value="Engineering 101"></div>
+					<div class="form-row">
+						<div class="form-group"><label class="field-label" for="room-name">Room</label><input class="input" id="room-name" value="ECG 207"></div>
+						<div class="form-group"><label class="field-label" for="radius">Radius</label><select id="radius"><option value="100">100 m</option><option value="75">75 m</option><option value="150">150 m</option></select></div>
+					</div>
+					<button class="primary full" id="start-session"><i data-lucide="play" style="width:14px;vertical-align:-3px"></i> Start attendance session</button>
+					<div class="session-meta"><div><span class="field-label">Session date</span><div class="session-value" id="session-date">September 22, 2026</div></div><div><span class="field-label">Duration</span><div class="session-value">15 minutes</div></div></div>
+				</article>
+				<article class="panel">
+					<div class="panel-head"><div><h2 class="panel-title" id="room-title">Engineering 101 · ECG 207</h2><p class="panel-sub">Today, September 22, 2026</p></div><span class="status" id="session-status">ACTIVE</span></div>
+					<div class="qr-stage"><img id="qr" width="190" height="190" aria-label="Session QR code"><div class="code" id="session-code">X7K4P9</div><div class="expires"><i data-lucide="timer" style="width:13px"></i> Expires in <strong id="countdown">14:32</strong></div></div>
+					<div class="table-foot" style="border-top:1px solid var(--line)"><span class="micro">Scan to open student check-in</span><div style="display:flex;gap:8px"><button class="secondary" id="present-qr"><i data-lucide="monitor-up" style="width:13px;vertical-align:-3px"></i> Present QR</button><button class="danger" id="end-session"><i data-lucide="square" style="width:13px;vertical-align:-3px"></i> End session</button></div></div>
+				</article>
+			</div>
+			<article class="panel" style="margin-top:20px">
+				<div class="panel-head"><div><h2 class="panel-title">Attendance log</h2><p class="panel-sub">Submissions appear here as students check in.</p></div><div style="display:flex;gap:8px"><button class="secondary" id="manage-roster"><i data-lucide="users" style="width:14px;vertical-align:-3px"></i> Manage roster</button><button class="secondary" id="export"><i data-lucide="download" style="width:14px;vertical-align:-3px"></i> Export CSV</button></div></div>
+				<div class="stats"><div class="stat"><div class="stat-number" id="present-count">0</div><div class="stat-name">Present</div></div><div class="stat"><div class="stat-number" id="flagged-count">0</div><div class="stat-name">Flagged for review</div></div><div class="stat"><div class="stat-number" id="enrolled-count">48</div><div class="stat-name">Enrolled students</div></div></div>
+				<div class="table-wrap" id="attendance-table"><table><thead><tr><th>Student</th><th>Time</th><th>Distance</th><th>Status</th></tr></thead><tbody id="attendance-body"></tbody></table></div>
+				<div class="empty" id="empty-log" style="display:none"><i data-lucide="clipboard-list"></i><div>No check-ins yet. Start the session and share the QR code with students.</div></div>
+			</article>
+		</section>
+
+		<section id="checkin" class="view">
+			<div class="checkin-layout"><article class="panel checkin-panel"><div class="checkin-intro"><div class="eyebrow">Engineering 101 · ECG 207</div><h2>You're in<br>the right place.</h2><p>Confirm your name and we'll use your location to verify this check-in. Your location is only used for this attendance submission.</p><div class="location-note"><i data-lucide="map-pin"></i><span>Location permission is requested only when you press Check in.</span></div></div><div class="checkin-form"><h3>Check in to class</h3><p class="panel-sub">Session X7K4P9 · closes in <strong id="student-countdown">14:32</strong></p><form id="checkin-form"><div class="form-group"><label class="field-label" for="student-name">Your name</label><input class="input" id="student-name" placeholder="e.g. Jane Smith" required autocomplete="name"></div><button class="primary full" type="submit" id="checkin-button"><i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in</button><div class="checkin-warning" id="checkin-warning" role="alert"></div></form><div class="result" id="result"><h4 id="result-name">Jane Smith</h4><div class="result-line"><i data-lucide="check"></i> Attendance code valid</div><div class="result-line"><i data-lucide="check"></i> Submitted just now</div><div class="result-line"><i data-lucide="map-pin"></i> <span id="result-distance">37 meters from classroom</span></div><div class="result-state" id="result-state">ATTENDANCE RECORDED</div></div></div></article></div>
+		</section>
+	</main>
+	<section class="presentation" id="presentation" aria-label="Projected QR code">
+		<button class="presentation-close" id="close-presentation"><i data-lucide="x" style="width:15px"></i> Exit presentation</button>
+		<div class="presentation-inner"><div><div class="presentation-eyebrow">Scan to check in</div><h2 id="presentation-title">Engineering 101</h2><p class="presentation-sub" id="presentation-room">ECG 207 · September 22, 2026</p><img class="presentation-qr" id="presentation-qr" alt="Scan this QR code to check in"><div class="presentation-code" id="presentation-code">X7K4P9</div><div class="presentation-expiry"><i data-lucide="timer" style="width:15px"></i> Session closes in <strong id="presentation-countdown">14:32</strong></div><div class="presentation-hint">Open your camera and point it at the code</div></div></div>
+	</section>
+	<section class="auth-gate" id="auth-gate" aria-label="Instructor access">
+		<form class="auth-card" id="auth-form">
+			<div class="auth-icon"><i data-lucide="lock-keyhole"></i></div>
+			<h2>Instructor access</h2>
+			<p>The dashboard contains attendance records and session controls. Enter the instructor password to continue.</p>
+			<div class="form-group"><label class="field-label" for="instructor-password">Password</label><input class="input" id="instructor-password" type="password" autocomplete="current-password" placeholder="Enter instructor password" required></div>
+			<button class="primary full" type="submit"><i data-lucide="arrow-right" style="width:14px;vertical-align:-3px"></i> Open dashboard</button>
+			<div class="auth-error" id="auth-error">That password is not correct.</div>
+		</form>
+	</section>
+	<section class="roster-modal" id="roster-modal" aria-label="Manage class roster">
+		<form class="roster-card" id="roster-form">
+			<div class="roster-head"><div><h2>Class roster</h2><p class="roster-help">Set the expected class size and optionally add one student name per line. Names make it easier to recognize attendance records later.</p></div><button class="close-icon" type="button" id="close-roster" aria-label="Close roster"><i data-lucide="x" style="width:16px"></i></button></div>
+			<div class="form-group"><label class="field-label" for="class-size">Enrolled class size</label><input class="input" id="class-size" type="number" min="1" max="500" value="48" required></div>
+			<div class="form-group"><label class="field-label" for="roster-names">Student names <span style="color:var(--muted);text-transform:none;letter-spacing:0">(optional)</span></label><textarea class="roster-textarea" id="roster-names" placeholder="Jane Smith&#10;Bob Jones&#10;Sarah Lee"></textarea></div>
+			<label class="check-option"><input id="require-roster-match" type="checkbox"><span>Require student names to match this roster before allowing check-in.</span></label>
+			<div class="roster-actions"><button class="secondary" type="button" id="cancel-roster">Cancel</button><button class="primary" type="submit"><i data-lucide="save" style="width:14px;vertical-align:-3px"></i> Save roster</button></div>
+		</form>
+	</section>
+	<div class="toast" id="toast" role="status"></div>
+	<script>
+		const records = [];
+		let roster = JSON.parse(localStorage.getItem('rollcall-roster') || '[]');
+		let requireRosterMatch = localStorage.getItem('rollcall-require-roster-match') === 'true';
+		let sessionCode = 'X7K4P9'; let secondsLeft = 872; let sessionActive = true;
+		let instructorAuthenticated = false;
+		const classroomLocation = { latitude: 33.4219, longitude: -111.9341 };
+		const $ = id => document.getElementById(id);
+		function initials(name) { return name.split(' ').map(word => word[0]).join('').slice(0, 2).toUpperCase(); }
+		function renderRecords() {
+			$('attendance-body').innerHTML = records.map(record => `<tr><td><div class="student"><span class="avatar">${initials(record.name)}</span>${record.name}</div></td><td>${record.time}</td><td>${record.distance}</td><td><span class="pill ${record.status === 'Present' ? 'present' : 'flagged'}">${record.status === 'Present' ? '✓ ' : '⚠ '}${record.status}</span></td></tr>`).join('');
+			$('present-count').textContent = records.filter(record => record.status === 'Present').length;
+			$('flagged-count').textContent = records.filter(record => record.status === 'Flagged').length;
+			$('attendance-table').style.display = records.length ? 'block' : 'none';
+			$('empty-log').style.display = records.length ? 'none' : 'block';
+		}
+		function updateClock() { const minutes = Math.floor(secondsLeft / 60).toString().padStart(2, '0'); const seconds = (secondsLeft % 60).toString().padStart(2, '0'); const time = `${minutes}:${seconds}`; $('countdown').textContent = time; $('student-countdown').textContent = time; $('presentation-countdown').textContent = time; if (secondsLeft > 0 && sessionActive) secondsLeft--; }
+		const publicBaseUrl = ''; // Set this to the deployed HTTPS URL, for example: https://attendance.example.com/index.html
+		function makeQr() { const baseUrl = publicBaseUrl || (location.protocol === 'http:' || location.protocol === 'https:' ? location.origin + location.pathname : ''); const url = `${baseUrl}?session=${sessionCode}#checkin`; const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=390x390&margin=8&color=8c1d40&data=${encodeURIComponent(url)}`; $('qr').src = qrUrl; $('presentation-qr').src = qrUrl; $('presentation-code').textContent = sessionCode; }
+		function distanceInMeters(latitude, longitude) { const earthRadius = 6371000; const toRadians = value => value * Math.PI / 180; const latitudeDelta = toRadians(latitude - classroomLocation.latitude); const longitudeDelta = toRadians(longitude - classroomLocation.longitude); const a = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(toRadians(classroomLocation.latitude)) * Math.cos(toRadians(latitude)) * Math.sin(longitudeDelta / 2) ** 2; return Math.round(earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))); }
+		function distanceLabel(distance) { return distance >= 1000 ? `${(distance / 1000).toFixed(1)} km` : `${distance} m`; }
+		function deviceToken() { let token = localStorage.getItem('rollcall-device-token'); if (!token) { token = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`; localStorage.setItem('rollcall-device-token', token); } return token; }
+		function checkinStorageKey() { return `rollcall-checkin-${sessionCode}-${deviceToken()}`; }
+		function showCheckinWarning(message) { $('checkin-warning').textContent = message; $('checkin-warning').classList.add('show'); }
+		function toast(message) { $('toast').textContent = message; $('toast').classList.add('show'); setTimeout(() => $('toast').classList.remove('show'), 2500); }
+		function showAuthGate() { $('auth-gate').classList.remove('hidden'); setTimeout(() => $('instructor-password').focus(), 0); }
+		function setView(view) { if (view === 'dashboard' && !instructorAuthenticated) { showAuthGate(); return; } document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.view === view)); document.querySelectorAll('.view').forEach(section => section.classList.toggle('active', section.id === view)); if (view === 'checkin') history.replaceState(null, '', `${location.pathname}?session=${sessionCode}#checkin`); }
+		document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => setView(tab.dataset.view)));
+		$('auth-form').addEventListener('submit', event => { event.preventDefault(); if ($('instructor-password').value === 'InstrUct') { instructorAuthenticated = true; $('auth-gate').classList.add('hidden'); $('auth-error').classList.remove('show'); $('instructor-password').value = ''; toast('Instructor dashboard unlocked'); } else { $('auth-error').classList.add('show'); $('instructor-password').select(); } });
+		function closeRoster() { $('roster-modal').classList.remove('open'); }
+		$('manage-roster').addEventListener('click', () => { $('class-size').value = $('enrolled-count').textContent; $('roster-names').value = roster.join('\n'); $('require-roster-match').checked = requireRosterMatch; $('roster-modal').classList.add('open'); $('class-size').focus(); });
+		$('close-roster').addEventListener('click', closeRoster); $('cancel-roster').addEventListener('click', closeRoster);
+		$('roster-form').addEventListener('submit', event => { event.preventDefault(); roster = $('roster-names').value.split('\n').map(name => name.trim()).filter(Boolean); requireRosterMatch = $('require-roster-match').checked; localStorage.setItem('rollcall-roster', JSON.stringify(roster)); localStorage.setItem('rollcall-require-roster-match', requireRosterMatch); $('enrolled-count').textContent = $('class-size').value; closeRoster(); toast(`Roster saved · ${$('class-size').value} students enrolled`); });
+		$('roster-modal').addEventListener('click', event => { if (event.target === $('roster-modal')) closeRoster(); });
+		$('start-session').addEventListener('click', () => { sessionCode = Math.random().toString(36).slice(2, 8).toUpperCase(); secondsLeft = 900; sessionActive = true; $('session-code').textContent = sessionCode; $('session-status').textContent = 'ACTIVE'; $('room-title').textContent = `${$('class-name').value} · ${$('room-name').value}`; $('presentation-title').textContent = $('class-name').value; $('presentation-room').textContent = `${$('room-name').value} · September 22, 2026`; makeQr(); toast('New attendance session started'); });
+		$('end-session').addEventListener('click', () => { sessionActive = false; $('session-status').textContent = 'ENDED'; $('session-status').style.color = '#a75b2e'; $('session-status').style.background = '#fff0e8'; toast('Attendance session ended'); });
+		$('present-qr').addEventListener('click', () => { $('presentation').classList.add('open'); document.documentElement.requestFullscreen?.().catch(() => {}); });
+		$('close-presentation').addEventListener('click', () => { $('presentation').classList.remove('open'); if (document.fullscreenElement) document.exitFullscreen?.(); });
+		document.addEventListener('keydown', event => { if (event.key === 'Escape') { $('presentation').classList.remove('open'); if (document.fullscreenElement) document.exitFullscreen?.(); } });
+		$('export').addEventListener('click', () => { const csv = ['Student,Time,Distance,Status', ...records.map(record => `${record.name},${record.time},${record.distance},${record.status}`)].join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); link.download = `attendance-${sessionCode}.csv`; link.click(); toast('CSV downloaded'); });
+		$('checkin-form').addEventListener('submit', event => { event.preventDefault(); const name = $('student-name').value.trim(); if (!name || !sessionActive) return; $('checkin-warning').classList.remove('show'); if (localStorage.getItem(checkinStorageKey())) { showCheckinWarning('This device has already submitted attendance for this session.'); return; } if (requireRosterMatch && !roster.some(rosterName => rosterName.toLowerCase() === name.toLowerCase())) { showCheckinWarning('That name is not on the class roster. Check the spelling or ask your instructor for help.'); return; } if (records.some(record => record.name.toLowerCase() === name.toLowerCase())) { showCheckinWarning('This name has already been recorded for this session. Please check with your instructor.'); return; } const button = $('checkin-button'); button.disabled = true; button.innerHTML = '<i data-lucide="loader-circle" style="width:15px;vertical-align:-3px"></i> Checking location...'; lucide.createIcons(); const finish = (distance, flagged) => { const formattedDistance = distanceLabel(distance); localStorage.setItem(checkinStorageKey(), JSON.stringify({ name, submittedAt: new Date().toISOString() })); records.unshift({ name, time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), distance: formattedDistance, status: flagged ? 'Flagged' : 'Present' }); renderRecords(); $('result').classList.toggle('flag', flagged); $('result').classList.add('show'); $('result-name').textContent = name; $('result-distance').textContent = `${formattedDistance} from classroom`; $('result-state').textContent = flagged ? 'ATTENDANCE FLAGGED' : 'ATTENDANCE RECORDED'; button.innerHTML = '<i data-lucide="check" style="width:15px;vertical-align:-3px"></i> Check-in recorded'; lucide.createIcons(); }; const radius = Number($('radius').value); if ('geolocation' in navigator) navigator.geolocation.getCurrentPosition(position => { const distance = distanceInMeters(position.coords.latitude, position.coords.longitude); finish(distance, distance > radius); }, () => finish(37, false), { timeout: 3000 }); else finish(37, false); });
+		renderRecords(); makeQr(); setInterval(updateClock, 1000); updateClock(); lucide.createIcons();
+		if (location.hash === '#checkin' || new URLSearchParams(location.search).has('session')) { $('auth-gate').classList.add('hidden'); setView('checkin'); }
+	</script>
+</body>
+</html>
