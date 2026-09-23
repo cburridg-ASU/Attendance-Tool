@@ -12,6 +12,7 @@ const memorySessions = new Map();
 
 app.use(cors({ origin: frontendOrigin }));
 app.use(express.json({ limit: '32kb' }));
+app.use(express.static(process.cwd(), { index: 'index.html' }));
 
 function cleanText(value, maxLength) {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
