@@ -214,14 +214,23 @@
 	<div class="toast" id="toast" role="status"></div>
 	<script>
 		const records = [];
-		let roster = JSON.parse(localStorage.getItem('rollcall-roster') || '[]');
-		let rosterConfigured = localStorage.getItem('rollcall-roster-configured') === 'true';
-		let enrolledCount = Number(localStorage.getItem('rollcall-enrolled-count') || 0);
-		let requireRosterMatch = localStorage.getItem('rollcall-require-roster-match') === 'true';
-		let sessionCode = 'X7K4P9'; let secondsLeft = 872; let sessionActive = rosterConfigured && enrolledCount > 0;
 		const urlParams = new URLSearchParams(location.search);
 		const sessionFromUrl = urlParams.get('session');
 		const validSessionFromUrl = sessionFromUrl && /^[A-Z0-9]{6}$/.test(sessionFromUrl.toUpperCase());
+		// Rosters are intentionally session-only for now. A future instructor login/data system
+		// will replace this temporary behavior with persistent instructor-owned rosters.
+		const isStudentCheckinPage = !!validSessionFromUrl;
+		if (!isStudentCheckinPage) {
+			localStorage.removeItem('rollcall-roster');
+			localStorage.removeItem('rollcall-roster-configured');
+			localStorage.removeItem('rollcall-enrolled-count');
+			localStorage.removeItem('rollcall-require-roster-match');
+		}
+		let roster = [];
+		let rosterConfigured = false;
+		let enrolledCount = 0;
+		let requireRosterMatch = false;
+		let sessionCode = 'X7K4P9'; let secondsLeft = 872; let sessionActive = rosterConfigured && enrolledCount > 0;
 		if (validSessionFromUrl) { sessionCode = sessionFromUrl.toUpperCase(); sessionActive = true; }
 		let instructorAuthenticated = false;
 		let classroomLocation = { latitude: 33.4219, longitude: -111.9341 };
@@ -248,11 +257,27 @@
 			return new Intl.DateTimeFormat('en-US', options).format(date);
 		}
 		function formatRecordTime(record) {
-			// Attendance time comes from the student's phone when available.
+			// Use the student's phone timestamp, but display that exact moment in the
+			// instructor's timezone. This avoids student/instructor timezone differences.
+			const clientTimestamp = record.clientTimestamp || record.clientTimestampUtc;
+			if (clientTimestamp) {
+				const date = new Date(clientTimestamp);
+				if (!Number.isNaN(date.getTime())) {
+					return new Intl.DateTimeFormat('en-US', {
+						timeZone: instructorTimeZone,
+						hour: 'numeric',
+						minute: '2-digit'
+					}).format(date);
+				}
+			}
 			if (record.clientTime) return record.clientTime;
 			if (record.time) return record.time;
-			const timestamp = record.clientTimestamp || record.timestamp || record.createdAt || record.checkedInAt || record.submittedAt || record.checkinTime;
-			if (timestamp) return formatDateTime(timestamp);
+			const timestamp = record.timestamp || record.createdAt || record.checkedInAt || record.submittedAt || record.checkinTime;
+			if (timestamp) {
+				const date = new Date(new Date(timestamp).getTime() + instructorServerTimeOffsetMs);
+				if (!Number.isNaN(date.getTime())) return new Intl.DateTimeFormat('en-US', { timeZone: instructorTimeZone, hour: 'numeric', minute: '2-digit' }).format(date);
+			}
+			return '—';
 			return '—';
 		}
 		function formatSessionDate(session) {
@@ -273,6 +298,8 @@
 		let serverSession = false;
 		let sessionStartedAt = null;
 		const APP_TIME_ZONE = 'America/Phoenix';
+		let instructorTimeZone = APP_TIME_ZONE;
+		let instructorServerTimeOffsetMs = 0;
 		async function apiRequest(path, options = {}) { const response = await fetch(`${apiBaseUrl}${path}`, { headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options }); const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.error || 'The attendance service is unavailable.'); return data; }
 		function applySession(session) {
 			serverSession = true;
@@ -280,6 +307,16 @@
 			sessionActive = session.active;
 			secondsLeft = 900;
 			sessionStartedAt = session.startedAt || session.createdAt || session.startTime || session.timestamp || session.date || session.clientStartedAt || sessionClientStartedAt || null;
+			if (session.instructorTimeZone) instructorTimeZone = session.instructorTimeZone;
+			// If the server clock and instructor device clock differ, use the instructor's
+			// clock as the display reference so student check-in times are aligned to it.
+			if (session.startedAt && sessionClientStartedAt) {
+				const serverStart = new Date(session.startedAt).getTime();
+				const instructorStart = new Date(sessionClientStartedAt).getTime();
+				if (Number.isFinite(serverStart) && Number.isFinite(instructorStart)) {
+					instructorServerTimeOffsetMs = instructorStart - serverStart;
+				}
+			}
 
 			const lat = Number(session.latitude ?? session.lat);
 			const lng = Number(session.longitude ?? session.lng);
@@ -311,7 +348,8 @@
 				radius: $('radius').value,
 				sessionStartedAt: sessionStartedAt || sessionClientStartedAt || new Date().toISOString(),
 				lat: classroomLocation.latitude,
-				lng: classroomLocation.longitude
+				lng: classroomLocation.longitude,
+				instructorTimeZone
 			}); const url = `${baseUrl}?${params.toString()}#checkin`; const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=390x390&margin=8&color=8c1d40&data=${encodeURIComponent(url)}`; $('qr').src = qrUrl; $('presentation-qr').src = qrUrl; updateSessionDetails(); }
 		function distanceInMeters(latitude, longitude) { const earthRadius = 6371000; const toRadians = value => value * Math.PI / 180; const latitudeDelta = toRadians(latitude - classroomLocation.latitude); const longitudeDelta = toRadians(longitude - classroomLocation.longitude); const a = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(toRadians(classroomLocation.latitude)) * Math.cos(toRadians(latitude)) * Math.sin(longitudeDelta / 2) ** 2; return Math.round(earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))); }
 		function distanceLabel(distance) { return distance >= 1000 ? `${(distance / 1000).toFixed(1)} km` : `${distance} m`; }
@@ -332,6 +370,7 @@
 
 			sessionClientStartedAt = new Date().toISOString();
 			sessionStartedAt = sessionClientStartedAt;
+			instructorTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || APP_TIME_ZONE;
 
 			const startSession = async () => {
 				try {
@@ -344,6 +383,7 @@
 							roster,
 							requireRosterMatch,
 							clientStartedAt: sessionClientStartedAt,
+							instructorTimeZone,
 							latitude: classroomLocation.latitude,
 							longitude: classroomLocation.longitude
 						})
@@ -375,18 +415,28 @@
 			}
 		});
 		$('end-session').addEventListener('click', async event => { if (!serverSession) return; event.stopImmediatePropagation(); try { await apiRequest(`/api/sessions/${encodeURIComponent(sessionCode)}/end`, { method: 'POST' }); sessionActive = false; $('session-status').textContent = 'ENDED'; $('session-status').style.color = '#a75b2e'; $('session-status').style.background = '#fff0e8'; toast('Attendance session ended'); } catch (error) { toast(error.message); } });
-		$('checkin-form').addEventListener('submit', async event => { event.preventDefault(); event.stopImmediatePropagation(); const name = $('student-name').value.trim(); if (!name) return; if (!serverSession) { showCheckinWarning('Connecting to the attendance session. Please try again in a moment.'); return; } if (!sessionActive) { showCheckinWarning('This attendance session is no longer active.'); return; } $('checkin-warning').classList.remove('show'); const button = $('checkin-button'); button.disabled = true; button.innerHTML = '<i data-lucide="loader-circle" style="width:15px;vertical-align:-3px"></i> Checking location...'; lucide.createIcons(); const submitCheckin = async distance => { try { const checkin = await apiRequest(`/api/sessions/${encodeURIComponent(sessionCode)}/checkins`, { method: 'POST', body: JSON.stringify({ name, distance, deviceToken: deviceToken(), timeZone: APP_TIME_ZONE }) }); records.unshift(checkin); renderRecords(); $('result').classList.remove('flag'); $('result').classList.add('show'); $('result-name').textContent = name; $('result-distance').textContent = `${checkin.distance} from classroom`; $('result-state').textContent = checkin.status === 'Present' ? 'ATTENDANCE RECORDED' : 'ATTENDANCE FLAGGED'; button.innerHTML = '<i data-lucide="check" style="width:15px;vertical-align:-3px"></i> Check-in recorded'; lucide.createIcons(); } catch (error) { showCheckinWarning(error.message); button.disabled = false; button.innerHTML = '<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in'; lucide.createIcons(); } }; if ('geolocation' in navigator) navigator.geolocation.getCurrentPosition(position => submitCheckin(distanceInMeters(position.coords.latitude, position.coords.longitude)), () => { showCheckinWarning('Unable to get your phone location. Please allow location access and try again.'); button.disabled = false; button.innerHTML = '<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in'; lucide.createIcons(); }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }); else { showCheckinWarning('Location is not available on this device.'); button.disabled = false; button.innerHTML = '<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in'; lucide.createIcons(); } });
+		$('checkin-form').addEventListener('submit', async event => { event.preventDefault(); event.stopImmediatePropagation(); const name = $('student-name').value.trim(); if (!name) return; if (!serverSession) { showCheckinWarning('Connecting to the attendance session. Please try again in a moment.'); return; } if (!sessionActive) { showCheckinWarning('This attendance session is no longer active.'); return; } $('checkin-warning').classList.remove('show'); const button = $('checkin-button'); button.disabled = true; button.innerHTML = '<i data-lucide="loader-circle" style="width:15px;vertical-align:-3px"></i> Checking location...'; lucide.createIcons(); const submitCheckin = async distance => { try { const clientTimestamp = new Date().toISOString(); const checkin = await apiRequest(`/api/sessions/${encodeURIComponent(sessionCode)}/checkins`, { method: 'POST', body: JSON.stringify({
+							name,
+						distance,
+						deviceToken: deviceToken(),
+						clientTimestamp,
+						clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'local',
+						instructorTimeZone
+					}) });
+				checkin.clientTimestamp = checkin.clientTimestamp || clientTimestamp;
+				checkin.clientTime = checkin.clientTime || new Intl.DateTimeFormat('en-US', { timeZone: instructorTimeZone, hour: 'numeric', minute: '2-digit' }).format(new Date(clientTimestamp));
+				records.unshift(checkin); renderRecords(); $('result').classList.remove('flag'); $('result').classList.add('show'); $('result-name').textContent = name; $('result-distance').textContent = `${checkin.distance} from classroom`; $('result-state').textContent = checkin.status === 'Present' ? 'ATTENDANCE RECORDED' : 'ATTENDANCE FLAGGED'; button.innerHTML = '<i data-lucide="check" style="width:15px;vertical-align:-3px"></i> Check-in recorded'; lucide.createIcons(); } catch (error) { showCheckinWarning(error.message); button.disabled = false; button.innerHTML = '<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in'; lucide.createIcons(); } }; if ('geolocation' in navigator) navigator.geolocation.getCurrentPosition(position => submitCheckin(distanceInMeters(position.coords.latitude, position.coords.longitude)), () => { showCheckinWarning('Unable to get your phone location. Please allow location access and try again.'); button.disabled = false; button.innerHTML = '<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in'; lucide.createIcons(); }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }); else { showCheckinWarning('Location is not available on this device.'); button.disabled = false; button.innerHTML = '<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in'; lucide.createIcons(); } });
 		function closeRoster() { $('roster-modal').classList.remove('open'); }
 		$('manage-roster').addEventListener('click', () => { $('class-size').value = enrolledCount || ''; $('roster-names').value = roster.join('\n'); $('require-roster-match').checked = requireRosterMatch; $('roster-modal').classList.add('open'); $('class-size').focus(); });
 		$('close-roster').addEventListener('click', closeRoster); $('cancel-roster').addEventListener('click', closeRoster);
-		$('roster-form').addEventListener('submit', event => { event.preventDefault(); roster = $('roster-names').value.split('\n').map(name => name.trim()).filter(Boolean); requireRosterMatch = $('require-roster-match').checked; enrolledCount = Number($('class-size').value); rosterConfigured = true; localStorage.setItem('rollcall-roster', JSON.stringify(roster)); localStorage.setItem('rollcall-require-roster-match', requireRosterMatch); localStorage.setItem('rollcall-roster-configured', 'true'); localStorage.setItem('rollcall-enrolled-count', enrolledCount); $('enrolled-count').textContent = enrolledCount; $('enrolled-count').classList.remove('roster-needed'); closeRoster(); toast(`Roster saved · ${enrolledCount} students enrolled`); });
+		$('roster-form').addEventListener('submit', event => { event.preventDefault(); roster = $('roster-names').value.split('\n').map(name => name.trim()).filter(Boolean); requireRosterMatch = $('require-roster-match').checked; enrolledCount = Number($('class-size').value); rosterConfigured = true; $('enrolled-count').textContent = enrolledCount; $('enrolled-count').classList.remove('roster-needed'); closeRoster(); toast(`Roster saved · ${enrolledCount} students enrolled`); });
 		$('roster-modal').addEventListener('click', event => { if (event.target === $('roster-modal')) closeRoster(); });
 		$('start-session').addEventListener('click', () => { if (!rosterConfigured || enrolledCount < 1) { $('manage-roster').click(); toast('Create a roster before starting attendance'); return; } sessionCode = Math.random().toString(36).slice(2, 8).toUpperCase(); secondsLeft = 900; sessionActive = true; $('session-status').textContent = 'ACTIVE'; $('session-status').style.color = ''; $('session-status').style.background = ''; updateSessionDetails(); makeQr(); toast('New attendance session started'); });
 		$('end-session').addEventListener('click', () => { sessionActive = false; $('session-status').textContent = 'ENDED'; $('session-status').style.color = '#a75b2e'; $('session-status').style.background = '#fff0e8'; toast('Attendance session ended'); });
 		$('present-qr').addEventListener('click', () => { $('presentation').classList.add('open'); document.documentElement.requestFullscreen?.().catch(() => {}); });
 		$('close-presentation').addEventListener('click', () => { $('presentation').classList.remove('open'); if (document.fullscreenElement) document.exitFullscreen?.(); });
 		document.addEventListener('keydown', event => { if (event.key === 'Escape') { $('presentation').classList.remove('open'); if (document.fullscreenElement) document.exitFullscreen?.(); } });
-		$('export').addEventListener('click', () => { const csv = ['Student,Time,Distance,Status', ...records.map(record => `${record.name},${record.time},${record.distance},${record.status}`)].join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); link.download = `attendance-${sessionCode}.csv`; link.click(); toast('CSV downloaded'); });
+		$('export').addEventListener('click', () => { const csv = ['Student,Time,Distance,Status', ...records.map(record => `${record.name},${formatRecordTime(record)},${record.distance},${record.status}`)].join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); link.download = `attendance-${sessionCode}.csv`; link.click(); toast('CSV downloaded'); });
 		$('checkin-form').addEventListener('submit', event => { event.preventDefault(); const name = $('student-name').value.trim(); if (!name || !sessionActive) return; $('checkin-warning').classList.remove('show'); if (localStorage.getItem(checkinStorageKey())) { showCheckinWarning('This device has already submitted attendance for this session.'); return; } if (requireRosterMatch && !roster.some(rosterName => rosterName.toLowerCase() === name.toLowerCase())) { showCheckinWarning('That name is not on the class roster. Check the spelling or ask your instructor for help.'); return; } if (records.some(record => record.name.toLowerCase() === name.toLowerCase())) { showCheckinWarning('This name has already been recorded for this session. Please check with your instructor.'); return; } const button = $('checkin-button'); button.disabled = true; button.innerHTML = '<i data-lucide="loader-circle" style="width:15px;vertical-align:-3px"></i> Checking location...'; lucide.createIcons(); const finish = (distance, flagged) => { const formattedDistance = distanceLabel(distance); localStorage.setItem(checkinStorageKey(), JSON.stringify({ name, submittedAt: new Date().toISOString() })); records.unshift({ name, time: formatDateTime(new Date()), distance: formattedDistance, status: flagged ? 'Flagged' : 'Present' }); renderRecords(); $('result').classList.toggle('flag', flagged); $('result').classList.add('show'); $('result-name').textContent = name; $('result-distance').textContent = `${formattedDistance} from classroom`; $('result-state').textContent = flagged ? 'ATTENDANCE FLAGGED' : 'ATTENDANCE RECORDED'; button.innerHTML = '<i data-lucide="check" style="width:15px;vertical-align:-3px"></i> Check-in recorded'; lucide.createIcons(); }; const radius = Number($('radius').value); if ('geolocation' in navigator) navigator.geolocation.getCurrentPosition(position => { const distance = distanceInMeters(position.coords.latitude, position.coords.longitude); finish(distance, distance > radius); }, () => finish(37, false), { timeout: 3000 }); else finish(37, false); });
 		if (validSessionFromUrl) {
 			const className = urlParams.get('class');
@@ -394,6 +444,9 @@
 			if (className) $('class-name').value = className;
 			if (roomName) $('room-name').value = roomName;
 			if (urlParams.get('radius')) $('radius').value = urlParams.get('radius');
+
+			const qrTimeZone = urlParams.get('instructorTimeZone');
+			if (qrTimeZone) instructorTimeZone = qrTimeZone;
 
 			const qrStartedAt = urlParams.get('sessionStartedAt');
 			if (qrStartedAt) {
