@@ -177,7 +177,7 @@
 				</article>
 			</div>
 			<article class="panel" style="margin-top:20px">
-				<div class="panel-head"><div><h2 class="panel-title">Attendance log</h2><p class="panel-sub">Submissions appear here as students check in.</p></div><div style="display:flex;gap:8px"><button class="secondary" id="manage-roster"><i data-lucide="users" style="width:14px;vertical-align:-3px"></i> Manage roster</button><button class="secondary" id="export"><i data-lucide="download" style="width:14px;vertical-align:-3px"></i> Export CSV</button></div></div>
+				<div class="panel-head"><div><h2 class="panel-title">Attendance log</h2><p class="panel-sub">Submissions appear here as students check in. <span id="live-sync-status" style="color:var(--green);font-family:'DM Mono',monospace;font-size:10px;margin-left:8px">● LIVE · Waiting for sync</span></p></div><div style="display:flex;gap:8px"><button class="secondary" id="manage-roster"><i data-lucide="users" style="width:14px;vertical-align:-3px"></i> Manage roster</button><button class="secondary" id="export"><i data-lucide="download" style="width:14px;vertical-align:-3px"></i> Export CSV</button></div></div>
 				<div class="stats"><div class="stat"><div class="stat-number" id="present-count">0</div><div class="stat-name">Present</div></div><div class="stat"><div class="stat-number" id="flagged-count">0</div><div class="stat-name">Flagged for review</div></div><div class="stat"><div class="stat-number roster-needed" id="enrolled-count">Roster needs to be created</div><div class="stat-name">Enrolled students</div></div></div>
 				<div class="table-wrap" id="attendance-table"><table><thead><tr><th>Student</th><th>Time</th><th>Distance</th><th>Status</th></tr></thead><tbody id="attendance-body"></tbody></table></div>
 				<div class="empty" id="empty-log" style="display:none"><i data-lucide="clipboard-list"></i><div>No check-ins yet. Start the session and share the QR code with students.</div></div>
@@ -240,8 +240,52 @@
 		let serverSession = false;
 		async function apiRequest(path, options = {}) { const response = await fetch(`${apiBaseUrl}${path}`, { headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options }); const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.error || 'The attendance service is unavailable.'); return data; }
 		function applySession(session) { serverSession = true; sessionCode = session.code; sessionActive = session.active; secondsLeft = 900; $('class-name').value = session.className; $('room-name').value = session.room; $('radius').value = session.radius; updateSessionDetails(); $('session-status').textContent = session.active ? 'ACTIVE' : 'ENDED'; $('session-status').style.color = session.active ? '' : '#a75b2e'; $('session-status').style.background = session.active ? '' : '#fff0e8'; records.splice(0, records.length, ...(session.checkins || [])); renderRecords(); makeQr(); }
-		async function refreshServerSession() { if (!validSessionFromUrl) return; try { applySession(await apiRequest(`/api/sessions/${encodeURIComponent(sessionCode)}`)); } catch (error) { if (location.hash === '#checkin') showCheckinWarning(error.message); } }
-		function startServerPolling() { if (!serverSession) return; refreshServerSession(); setInterval(refreshServerSession, 3000); }
+		let serverPollingInterval = null;
+		let lastServerUpdate = null;
+
+		async function refreshServerSession() {
+			if (!serverSession && !validSessionFromUrl) return;
+
+			try {
+				const session = await apiRequest(`/api/sessions/${encodeURIComponent(sessionCode)}`);
+				applySession(session);
+				lastServerUpdate = new Date();
+				updateLiveSyncStatus();
+			} catch (error) {
+				if (location.hash === '#checkin') {
+					showCheckinWarning(error.message);
+				}
+			}
+		}
+
+		function updateLiveSyncStatus() {
+			const status = document.getElementById('live-sync-status');
+			if (!status) return;
+
+			if (lastServerUpdate) {
+				status.textContent = `● LIVE · Updated ${lastServerUpdate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}`;
+			} else {
+				status.textContent = '● LIVE · Syncing...';
+			}
+		}
+
+		function startServerPolling() {
+			if (!serverSession) return;
+
+			// Prevent multiple polling loops if the session is restarted.
+			if (serverPollingInterval) {
+				clearInterval(serverPollingInterval);
+			}
+
+			// Update immediately, then keep the instructor roster synchronized.
+			refreshServerSession();
+
+			serverPollingInterval = setInterval(() => {
+				if (serverSession && sessionActive) {
+					refreshServerSession();
+				}
+			}, 2000);
+		}
 		function updateSessionDetails(className = $('class-name').value, roomName = $('room-name').value) { const classroom = `${className} · ${roomName}`; $('room-title').textContent = classroom; $('checkin-classroom').textContent = classroom; $('presentation-title').textContent = className; $('presentation-room').textContent = `${roomName} · September 22, 2026`; $('session-code').textContent = sessionCode; $('checkin-session-code').textContent = sessionCode; $('presentation-code').textContent = sessionCode; }
 		function makeQr() { const baseUrl = publicBaseUrl || (location.protocol === 'http:' || location.protocol === 'https:' ? location.origin + location.pathname : location.href.split(/[?#]/)[0]); const params = new URLSearchParams({ session: sessionCode, class: $('class-name').value, room: $('room-name').value, radius: $('radius').value }); const url = `${baseUrl}?${params.toString()}#checkin`; const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=390x390&margin=8&color=8c1d40&data=${encodeURIComponent(url)}`; $('qr').src = qrUrl; $('presentation-qr').src = qrUrl; updateSessionDetails(); }
 		function distanceInMeters(latitude, longitude) { const earthRadius = 6371000; const toRadians = value => value * Math.PI / 180; const latitudeDelta = toRadians(latitude - classroomLocation.latitude); const longitudeDelta = toRadians(longitude - classroomLocation.longitude); const a = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(toRadians(classroomLocation.latitude)) * Math.cos(toRadians(latitude)) * Math.sin(longitudeDelta / 2) ** 2; return Math.round(earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))); }
@@ -256,7 +300,84 @@
 		$('auth-form').addEventListener('submit', event => { event.preventDefault(); if ($('instructor-password').value === 'InstrUct') { instructorAuthenticated = true; $('auth-gate').classList.add('hidden'); $('auth-error').classList.remove('show'); $('instructor-password').value = ''; toast('Instructor dashboard unlocked'); } else { $('auth-error').classList.add('show'); $('instructor-password').select(); } });
 		$('start-session').addEventListener('click', async event => { event.stopImmediatePropagation(); if (!rosterConfigured || enrolledCount < 1) { $('manage-roster').click(); toast('Create a roster before starting attendance'); return; } const button = $('start-session'); button.disabled = true; try { const session = await apiRequest('/api/sessions', { method: 'POST', body: JSON.stringify({ className: $('class-name').value, room: $('room-name').value, radius: $('radius').value, roster, requireRosterMatch }) }); applySession(session); history.replaceState(null, '', location.pathname); startServerPolling(); toast('New attendance session started'); } catch (error) { toast(error.message); } finally { button.disabled = false; } });
 		$('end-session').addEventListener('click', async event => { if (!serverSession) return; event.stopImmediatePropagation(); try { await apiRequest(`/api/sessions/${encodeURIComponent(sessionCode)}/end`, { method: 'POST' }); sessionActive = false; $('session-status').textContent = 'ENDED'; $('session-status').style.color = '#a75b2e'; $('session-status').style.background = '#fff0e8'; toast('Attendance session ended'); } catch (error) { toast(error.message); } });
-		$('checkin-form').addEventListener('submit', async event => { event.preventDefault(); event.stopImmediatePropagation(); const name = $('student-name').value.trim(); if (!name) return; if (!serverSession) { showCheckinWarning('Connecting to the attendance session. Please try again in a moment.'); return; } if (!sessionActive) { showCheckinWarning('This attendance session is no longer active.'); return; } $('checkin-warning').classList.remove('show'); const button = $('checkin-button'); button.disabled = true; button.innerHTML = '<i data-lucide="loader-circle" style="width:15px;vertical-align:-3px"></i> Checking location...'; lucide.createIcons(); const submitCheckin = async distance => { try { const checkin = await apiRequest(`/api/sessions/${encodeURIComponent(sessionCode)}/checkins`, { method: 'POST', body: JSON.stringify({ name, distance, deviceToken: deviceToken() }) }); records.unshift(checkin); renderRecords(); $('result').classList.remove('flag'); $('result').classList.add('show'); $('result-name').textContent = name; $('result-distance').textContent = `${checkin.distance} from classroom`; $('result-state').textContent = checkin.status === 'Present' ? 'ATTENDANCE RECORDED' : 'ATTENDANCE FLAGGED'; button.innerHTML = '<i data-lucide="check" style="width:15px;vertical-align:-3px"></i> Check-in recorded'; lucide.createIcons(); } catch (error) { showCheckinWarning(error.message); button.disabled = false; button.innerHTML = '<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in'; lucide.createIcons(); } }; if ('geolocation' in navigator) navigator.geolocation.getCurrentPosition(position => submitCheckin(distanceInMeters(position.coords.latitude, position.coords.longitude)), () => submitCheckin(0), { enableHighAccuracy: true, timeout: 10000 }); else submitCheckin(0); });
+		$('checkin-form').addEventListener('submit', async event => {
+			event.preventDefault();
+			event.stopImmediatePropagation();
+
+			const name = $('student-name').value.trim();
+			if (!name) return;
+
+			if (!serverSession) {
+				showCheckinWarning('Connecting to the attendance session. Please try again in a moment.');
+				return;
+			}
+
+			if (!sessionActive) {
+				showCheckinWarning('This attendance session is no longer active.');
+				return;
+			}
+
+			$('checkin-warning').classList.remove('show');
+
+			const button = $('checkin-button');
+			button.disabled = true;
+			button.innerHTML = '<i data-lucide="loader-circle" style="width:15px;vertical-align:-3px"></i> Checking location...';
+			lucide.createIcons();
+
+			const submitCheckin = async distance => {
+				try {
+					const checkin = await apiRequest(
+						`/api/sessions/${encodeURIComponent(sessionCode)}/checkins`,
+						{
+							method: 'POST',
+							body: JSON.stringify({
+								name,
+								distance,
+								deviceToken: deviceToken()
+							})
+						}
+					);
+
+					// The server is the source of truth. Refresh immediately so
+					// the instructor dashboard and this page use the same record.
+					await refreshServerSession();
+
+					$('result').classList.remove('flag');
+					$('result').classList.add('show');
+					$('result-name').textContent = name;
+					$('result-distance').textContent = `${checkin.distance} from classroom`;
+					$('result-state').textContent =
+						checkin.status === 'Present'
+							? 'ATTENDANCE RECORDED'
+							: 'ATTENDANCE FLAGGED';
+
+					button.innerHTML =
+						'<i data-lucide="check" style="width:15px;vertical-align:-3px"></i> Check-in recorded';
+					lucide.createIcons();
+				} catch (error) {
+					showCheckinWarning(error.message);
+					button.disabled = false;
+					button.innerHTML =
+						'<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in';
+					lucide.createIcons();
+				}
+			};
+
+			if ('geolocation' in navigator) {
+				navigator.geolocation.getCurrentPosition(
+					position => submitCheckin(
+						distanceInMeters(
+							position.coords.latitude,
+							position.coords.longitude
+						)
+					),
+					() => submitCheckin(0),
+					{ enableHighAccuracy: true, timeout: 10000 }
+				);
+			} else {
+				submitCheckin(0);
+			}
+		});
 		function closeRoster() { $('roster-modal').classList.remove('open'); }
 		$('manage-roster').addEventListener('click', () => { $('class-size').value = enrolledCount || ''; $('roster-names').value = roster.join('\n'); $('require-roster-match').checked = requireRosterMatch; $('roster-modal').classList.add('open'); $('class-size').focus(); });
 		$('close-roster').addEventListener('click', closeRoster); $('cancel-roster').addEventListener('click', closeRoster);
@@ -268,7 +389,7 @@
 		$('close-presentation').addEventListener('click', () => { $('presentation').classList.remove('open'); if (document.fullscreenElement) document.exitFullscreen?.(); });
 		document.addEventListener('keydown', event => { if (event.key === 'Escape') { $('presentation').classList.remove('open'); if (document.fullscreenElement) document.exitFullscreen?.(); } });
 		$('export').addEventListener('click', () => { const csv = ['Student,Time,Distance,Status', ...records.map(record => `${record.name},${record.time},${record.distance},${record.status}`)].join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); link.download = `attendance-${sessionCode}.csv`; link.click(); toast('CSV downloaded'); });
-		$('checkin-form').addEventListener('submit', event => { event.preventDefault(); const name = $('student-name').value.trim(); if (!name || !sessionActive) return; $('checkin-warning').classList.remove('show'); if (localStorage.getItem(checkinStorageKey())) { showCheckinWarning('This device has already submitted attendance for this session.'); return; } if (requireRosterMatch && !roster.some(rosterName => rosterName.toLowerCase() === name.toLowerCase())) { showCheckinWarning('That name is not on the class roster. Check the spelling or ask your instructor for help.'); return; } if (records.some(record => record.name.toLowerCase() === name.toLowerCase())) { showCheckinWarning('This name has already been recorded for this session. Please check with your instructor.'); return; } const button = $('checkin-button'); button.disabled = true; button.innerHTML = '<i data-lucide="loader-circle" style="width:15px;vertical-align:-3px"></i> Checking location...'; lucide.createIcons(); const finish = (distance, flagged) => { const formattedDistance = distanceLabel(distance); localStorage.setItem(checkinStorageKey(), JSON.stringify({ name, submittedAt: new Date().toISOString() })); records.unshift({ name, time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), distance: formattedDistance, status: flagged ? 'Flagged' : 'Present' }); renderRecords(); $('result').classList.toggle('flag', flagged); $('result').classList.add('show'); $('result-name').textContent = name; $('result-distance').textContent = `${formattedDistance} from classroom`; $('result-state').textContent = flagged ? 'ATTENDANCE FLAGGED' : 'ATTENDANCE RECORDED'; button.innerHTML = '<i data-lucide="check" style="width:15px;vertical-align:-3px"></i> Check-in recorded'; lucide.createIcons(); }; const radius = Number($('radius').value); if ('geolocation' in navigator) navigator.geolocation.getCurrentPosition(position => { const distance = distanceInMeters(position.coords.latitude, position.coords.longitude); finish(distance, distance > radius); }, () => finish(37, false), { timeout: 3000 }); else finish(37, false); });
+
 		if (validSessionFromUrl) { const className = urlParams.get('class'); const roomName = urlParams.get('room'); if (className) $('class-name').value = className; if (roomName) $('room-name').value = roomName; if (urlParams.get('radius')) $('radius').value = urlParams.get('radius'); updateSessionDetails(className || $('class-name').value, roomName || $('room-name').value); refreshServerSession(); }
 		if (rosterConfigured && enrolledCount > 0) { $('enrolled-count').textContent = enrolledCount; $('enrolled-count').classList.remove('roster-needed'); } else if (!validSessionFromUrl) { $('session-status').textContent = 'SETUP REQUIRED'; $('session-status').style.color = 'var(--orange)'; $('session-status').style.background = '#fff0e8'; }
 		renderRecords(); makeQr(); setInterval(updateClock, 1000); updateClock(); lucide.createIcons();
