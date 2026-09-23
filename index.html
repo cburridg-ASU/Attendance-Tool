@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Rollcall | Classroom Attendance</title>
+	<title>AttendanceRabbit | Classroom Attendance</title>
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 	<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -17,8 +17,9 @@
 		.shell { max-width:1320px; margin:auto; padding:26px 38px 48px; }
 		.topbar { display:flex; align-items:center; justify-content:space-between; padding-bottom:28px; border-bottom:1px solid var(--line); }
 		.brand { display:flex; align-items:center; gap:12px; font-weight:800; letter-spacing:-.04em; font-size:21px; }
-		.brand-mark { width:35px; height:35px; display:grid; place-items:center; color:white; background:var(--ink); border-radius:10px; }
-		.brand-mark i { width:18px; height:18px; }
+		.brand-mark { position:relative; width:35px; height:35px; display:grid; place-items:center; color:white; background:var(--ink); border-radius:10px; }
+		.brand-mark .brand-rabbit { width:22px; height:22px; }
+		.brand-mark .brand-lock { position:absolute; right:3px; bottom:3px; width:13px; height:13px; padding:1px; background:var(--ink); border-radius:3px; }
 		.top-note { color:var(--muted); font-size:12px; font-family:'DM Mono', monospace; letter-spacing:.02em; }
 		.hero { display:flex; justify-content:space-between; align-items:end; gap:24px; padding:46px 0 34px; }
 		.eyebrow { color:var(--green); font:500 11px 'DM Mono', monospace; text-transform:uppercase; letter-spacing:.12em; }
@@ -65,6 +66,7 @@
 		.stat { padding:22px 25px; border-right:1px solid var(--line); }
 		.stat:last-child { border:0; }
 		.stat-number { font-size:26px; font-weight:800; letter-spacing:-.06em; }
+		.stat-number.roster-needed { color:var(--orange); font-size:13px; letter-spacing:0; line-height:1.35; }
 		.stat-name { color:var(--muted); font-size:11px; margin-top:4px; }
 		.table-wrap { overflow-x:auto; }
 		table { width:100%; border-collapse:collapse; font-size:12px; min-width:590px; }
@@ -143,7 +145,7 @@
 <body>
 	<main class="shell">
 		<header class="topbar">
-			<div class="brand"><span class="brand-mark"><i data-lucide="scan-line"></i></span> rollcall</div>
+			<div class="brand"><span class="brand-mark" aria-label="AttendanceRabbit logo"><i class="brand-rabbit" data-lucide="rabbit"></i><i class="brand-lock" data-lucide="lock-keyhole"></i></span> AttendanceRabbit</div>
 			<div class="top-note">CLASSROOM OPPERATIONS / 2026</div>
 		</header>
 		<section class="hero">
@@ -176,7 +178,7 @@
 			</div>
 			<article class="panel" style="margin-top:20px">
 				<div class="panel-head"><div><h2 class="panel-title">Attendance log</h2><p class="panel-sub">Submissions appear here as students check in.</p></div><div style="display:flex;gap:8px"><button class="secondary" id="manage-roster"><i data-lucide="users" style="width:14px;vertical-align:-3px"></i> Manage roster</button><button class="secondary" id="export"><i data-lucide="download" style="width:14px;vertical-align:-3px"></i> Export CSV</button></div></div>
-				<div class="stats"><div class="stat"><div class="stat-number" id="present-count">0</div><div class="stat-name">Present</div></div><div class="stat"><div class="stat-number" id="flagged-count">0</div><div class="stat-name">Flagged for review</div></div><div class="stat"><div class="stat-number" id="enrolled-count">48</div><div class="stat-name">Enrolled students</div></div></div>
+				<div class="stats"><div class="stat"><div class="stat-number" id="present-count">0</div><div class="stat-name">Present</div></div><div class="stat"><div class="stat-number" id="flagged-count">0</div><div class="stat-name">Flagged for review</div></div><div class="stat"><div class="stat-number roster-needed" id="enrolled-count">Roster needs to be created</div><div class="stat-name">Enrolled students</div></div></div>
 				<div class="table-wrap" id="attendance-table"><table><thead><tr><th>Student</th><th>Time</th><th>Distance</th><th>Status</th></tr></thead><tbody id="attendance-body"></tbody></table></div>
 				<div class="empty" id="empty-log" style="display:none"><i data-lucide="clipboard-list"></i><div>No check-ins yet. Start the session and share the QR code with students.</div></div>
 			</article>
@@ -213,8 +215,10 @@
 	<script>
 		const records = [];
 		let roster = JSON.parse(localStorage.getItem('rollcall-roster') || '[]');
+		let rosterConfigured = localStorage.getItem('rollcall-roster-configured') === 'true';
+		let enrolledCount = Number(localStorage.getItem('rollcall-enrolled-count') || 0);
 		let requireRosterMatch = localStorage.getItem('rollcall-require-roster-match') === 'true';
-		let sessionCode = 'X7K4P9'; let secondsLeft = 872; let sessionActive = true;
+		let sessionCode = 'X7K4P9'; let secondsLeft = 872; let sessionActive = rosterConfigured && enrolledCount > 0;
 		const sessionFromUrl = new URLSearchParams(location.search).get('session');
 		if (sessionFromUrl && /^[A-Z0-9]{6}$/.test(sessionFromUrl.toUpperCase())) sessionCode = sessionFromUrl.toUpperCase();
 		let instructorAuthenticated = false;
@@ -242,17 +246,18 @@
 		document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => setView(tab.dataset.view)));
 		$('auth-form').addEventListener('submit', event => { event.preventDefault(); if ($('instructor-password').value === 'InstrUct') { instructorAuthenticated = true; $('auth-gate').classList.add('hidden'); $('auth-error').classList.remove('show'); $('instructor-password').value = ''; toast('Instructor dashboard unlocked'); } else { $('auth-error').classList.add('show'); $('instructor-password').select(); } });
 		function closeRoster() { $('roster-modal').classList.remove('open'); }
-		$('manage-roster').addEventListener('click', () => { $('class-size').value = $('enrolled-count').textContent; $('roster-names').value = roster.join('\n'); $('require-roster-match').checked = requireRosterMatch; $('roster-modal').classList.add('open'); $('class-size').focus(); });
+		$('manage-roster').addEventListener('click', () => { $('class-size').value = enrolledCount || ''; $('roster-names').value = roster.join('\n'); $('require-roster-match').checked = requireRosterMatch; $('roster-modal').classList.add('open'); $('class-size').focus(); });
 		$('close-roster').addEventListener('click', closeRoster); $('cancel-roster').addEventListener('click', closeRoster);
-		$('roster-form').addEventListener('submit', event => { event.preventDefault(); roster = $('roster-names').value.split('\n').map(name => name.trim()).filter(Boolean); requireRosterMatch = $('require-roster-match').checked; localStorage.setItem('rollcall-roster', JSON.stringify(roster)); localStorage.setItem('rollcall-require-roster-match', requireRosterMatch); $('enrolled-count').textContent = $('class-size').value; closeRoster(); toast(`Roster saved · ${$('class-size').value} students enrolled`); });
+		$('roster-form').addEventListener('submit', event => { event.preventDefault(); roster = $('roster-names').value.split('\n').map(name => name.trim()).filter(Boolean); requireRosterMatch = $('require-roster-match').checked; enrolledCount = Number($('class-size').value); rosterConfigured = true; localStorage.setItem('rollcall-roster', JSON.stringify(roster)); localStorage.setItem('rollcall-require-roster-match', requireRosterMatch); localStorage.setItem('rollcall-roster-configured', 'true'); localStorage.setItem('rollcall-enrolled-count', enrolledCount); $('enrolled-count').textContent = enrolledCount; $('enrolled-count').classList.remove('roster-needed'); closeRoster(); toast(`Roster saved · ${enrolledCount} students enrolled`); });
 		$('roster-modal').addEventListener('click', event => { if (event.target === $('roster-modal')) closeRoster(); });
-		$('start-session').addEventListener('click', () => { sessionCode = Math.random().toString(36).slice(2, 8).toUpperCase(); secondsLeft = 900; sessionActive = true; $('session-code').textContent = sessionCode; $('session-status').textContent = 'ACTIVE'; $('room-title').textContent = `${$('class-name').value} · ${$('room-name').value}`; $('presentation-title').textContent = $('class-name').value; $('presentation-room').textContent = `${$('room-name').value} · September 22, 2026`; makeQr(); toast('New attendance session started'); });
+		$('start-session').addEventListener('click', () => { if (!rosterConfigured || enrolledCount < 1) { $('manage-roster').click(); toast('Create a roster before starting attendance'); return; } sessionCode = Math.random().toString(36).slice(2, 8).toUpperCase(); secondsLeft = 900; sessionActive = true; $('session-code').textContent = sessionCode; $('session-status').textContent = 'ACTIVE'; $('room-title').textContent = `${$('class-name').value} · ${$('room-name').value}`; $('presentation-title').textContent = $('class-name').value; $('presentation-room').textContent = `${$('room-name').value} · September 22, 2026`; makeQr(); toast('New attendance session started'); });
 		$('end-session').addEventListener('click', () => { sessionActive = false; $('session-status').textContent = 'ENDED'; $('session-status').style.color = '#a75b2e'; $('session-status').style.background = '#fff0e8'; toast('Attendance session ended'); });
 		$('present-qr').addEventListener('click', () => { $('presentation').classList.add('open'); document.documentElement.requestFullscreen?.().catch(() => {}); });
 		$('close-presentation').addEventListener('click', () => { $('presentation').classList.remove('open'); if (document.fullscreenElement) document.exitFullscreen?.(); });
 		document.addEventListener('keydown', event => { if (event.key === 'Escape') { $('presentation').classList.remove('open'); if (document.fullscreenElement) document.exitFullscreen?.(); } });
 		$('export').addEventListener('click', () => { const csv = ['Student,Time,Distance,Status', ...records.map(record => `${record.name},${record.time},${record.distance},${record.status}`)].join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); link.download = `attendance-${sessionCode}.csv`; link.click(); toast('CSV downloaded'); });
 		$('checkin-form').addEventListener('submit', event => { event.preventDefault(); const name = $('student-name').value.trim(); if (!name || !sessionActive) return; $('checkin-warning').classList.remove('show'); if (localStorage.getItem(checkinStorageKey())) { showCheckinWarning('This device has already submitted attendance for this session.'); return; } if (requireRosterMatch && !roster.some(rosterName => rosterName.toLowerCase() === name.toLowerCase())) { showCheckinWarning('That name is not on the class roster. Check the spelling or ask your instructor for help.'); return; } if (records.some(record => record.name.toLowerCase() === name.toLowerCase())) { showCheckinWarning('This name has already been recorded for this session. Please check with your instructor.'); return; } const button = $('checkin-button'); button.disabled = true; button.innerHTML = '<i data-lucide="loader-circle" style="width:15px;vertical-align:-3px"></i> Checking location...'; lucide.createIcons(); const finish = (distance, flagged) => { const formattedDistance = distanceLabel(distance); localStorage.setItem(checkinStorageKey(), JSON.stringify({ name, submittedAt: new Date().toISOString() })); records.unshift({ name, time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), distance: formattedDistance, status: flagged ? 'Flagged' : 'Present' }); renderRecords(); $('result').classList.toggle('flag', flagged); $('result').classList.add('show'); $('result-name').textContent = name; $('result-distance').textContent = `${formattedDistance} from classroom`; $('result-state').textContent = flagged ? 'ATTENDANCE FLAGGED' : 'ATTENDANCE RECORDED'; button.innerHTML = '<i data-lucide="check" style="width:15px;vertical-align:-3px"></i> Check-in recorded'; lucide.createIcons(); }; const radius = Number($('radius').value); if ('geolocation' in navigator) navigator.geolocation.getCurrentPosition(position => { const distance = distanceInMeters(position.coords.latitude, position.coords.longitude); finish(distance, distance > radius); }, () => finish(37, false), { timeout: 3000 }); else finish(37, false); });
+		if (rosterConfigured && enrolledCount > 0) { $('enrolled-count').textContent = enrolledCount; $('enrolled-count').classList.remove('roster-needed'); } else { $('session-status').textContent = 'SETUP REQUIRED'; $('session-status').style.color = 'var(--orange)'; $('session-status').style.background = '#fff0e8'; }
 		renderRecords(); makeQr(); setInterval(updateClock, 1000); updateClock(); lucide.createIcons();
 		if (location.hash === '#checkin' || new URLSearchParams(location.search).has('session')) { $('auth-gate').classList.add('hidden'); setView('checkin'); }
 	</script>
