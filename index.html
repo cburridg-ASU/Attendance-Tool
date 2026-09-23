@@ -224,7 +224,18 @@
 		const validSessionFromUrl = sessionFromUrl && /^[A-Z0-9]{6}$/.test(sessionFromUrl.toUpperCase());
 		if (validSessionFromUrl) { sessionCode = sessionFromUrl.toUpperCase(); sessionActive = true; }
 		let instructorAuthenticated = false;
-		const classroomLocation = { latitude: 33.4219, longitude: -111.9341 };
+		let classroomLocation = { latitude: 33.4219, longitude: -111.9341 };
+		let classroomLocationSource = 'default';
+		let sessionClientStartedAt = null;
+		function getPhoneTime() {
+			const now = new Date();
+			return {
+				iso: now.toISOString(),
+				time: now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+				date: now.toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' }),
+				timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'local'
+			};
+		}
 		const $ = id => document.getElementById(id);
 		function initials(name) { return name.split(' ').map(word => word[0]).join('').slice(0, 2).toUpperCase(); }
 		function formatDateTime(value, includeDate = false) {
@@ -237,13 +248,15 @@
 			return new Intl.DateTimeFormat('en-US', options).format(date);
 		}
 		function formatRecordTime(record) {
-			const timestamp = record.timestamp || record.createdAt || record.checkedInAt || record.submittedAt || record.checkinTime;
+			// Attendance time comes from the student's phone when available.
+			if (record.clientTime) return record.clientTime;
+			if (record.time) return record.time;
+			const timestamp = record.clientTimestamp || record.timestamp || record.createdAt || record.checkedInAt || record.submittedAt || record.checkinTime;
 			if (timestamp) return formatDateTime(timestamp);
-			// Supports older records where the server already returned a display string.
-			return record.time || '—';
+			return '—';
 		}
 		function formatSessionDate(session) {
-			const timestamp = session.startedAt || session.createdAt || session.startTime || session.timestamp || session.date;
+			const timestamp = session.startedAt || session.createdAt || session.startTime || session.timestamp || session.date || session.clientStartedAt || sessionClientStartedAt;
 			if (timestamp) return formatDateTime(timestamp, true).replace(/,? \d{1,2}:\d{2} (AM|PM)$/i, '');
 			return '—';
 		}
@@ -261,12 +274,45 @@
 		let sessionStartedAt = null;
 		const APP_TIME_ZONE = 'America/Phoenix';
 		async function apiRequest(path, options = {}) { const response = await fetch(`${apiBaseUrl}${path}`, { headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options }); const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.error || 'The attendance service is unavailable.'); return data; }
-		function applySession(session) { serverSession = true; sessionCode = session.code; sessionActive = session.active; secondsLeft = 900; sessionStartedAt = session.startedAt || session.createdAt || session.startTime || session.timestamp || session.date || null; $('class-name').value = session.className; $('room-name').value = session.room; $('radius').value = session.radius; updateSessionDetails(); $('session-status').textContent = session.active ? 'ACTIVE' : 'ENDED'; $('session-status').style.color = session.active ? '' : '#a75b2e'; $('session-status').style.background = session.active ? '' : '#fff0e8'; records.splice(0, records.length, ...(session.checkins || [])); renderRecords(); makeQr(); }
+		function applySession(session) {
+			serverSession = true;
+			sessionCode = session.code;
+			sessionActive = session.active;
+			secondsLeft = 900;
+			sessionStartedAt = session.startedAt || session.createdAt || session.startTime || session.timestamp || session.date || session.clientStartedAt || sessionClientStartedAt || null;
+
+			const lat = Number(session.latitude ?? session.lat);
+			const lng = Number(session.longitude ?? session.lng);
+			if (Number.isFinite(lat) && Number.isFinite(lng)) {
+				classroomLocation = { latitude: lat, longitude: lng };
+				classroomLocationSource = 'session';
+			}
+
+			$('class-name').value = session.className;
+			$('room-name').value = session.room;
+			$('radius').value = session.radius;
+			updateSessionDetails();
+			$('session-status').textContent = session.active ? 'ACTIVE' : 'ENDED';
+			$('session-status').style.color = session.active ? '' : '#a75b2e';
+			$('session-status').style.background = session.active ? '' : '#fff0e8';
+
+			records.splice(0, records.length, ...(session.checkins || []));
+			renderRecords();
+			makeQr();
+		}
 		let serverPollingInterval = null;
 		async function refreshServerSession() { if (!serverSession && !validSessionFromUrl) return; try { applySession(await apiRequest(`/api/sessions/${encodeURIComponent(sessionCode)}`)); } catch (error) { if (location.hash === '#checkin') showCheckinWarning(error.message); } }
 		function startServerPolling() { if (serverPollingInterval) clearInterval(serverPollingInterval); refreshServerSession(); serverPollingInterval = setInterval(() => { if (serverSession && sessionActive) refreshServerSession(); }, 2000); }
 		function updateSessionDetails(className = $('class-name').value, roomName = $('room-name').value) { const classroom = `${className} · ${roomName}`; const sessionDate = sessionStartedAt ? formatSessionDate({ startedAt: sessionStartedAt }) : null; $('room-title').textContent = classroom; $('checkin-classroom').textContent = classroom; $('presentation-title').textContent = className; $('presentation-room').textContent = `${roomName} · ${sessionDate || 'Today'}`; $('session-code').textContent = sessionCode; $('checkin-session-code').textContent = sessionCode; $('presentation-code').textContent = sessionCode; if ($('session-date')) $('session-date').textContent = sessionDate || 'Waiting for session time'; const panelSub = document.querySelector('#room-title')?.closest('.panel-head')?.querySelector('.panel-sub'); if (panelSub) panelSub.textContent = sessionDate ? `Session date: ${sessionDate}` : 'Session date unavailable'; }
-		function makeQr() { const baseUrl = publicBaseUrl || (location.protocol === 'http:' || location.protocol === 'https:' ? location.origin + location.pathname : location.href.split(/[?#]/)[0]); const params = new URLSearchParams({ session: sessionCode, class: $('class-name').value, room: $('room-name').value, radius: $('radius').value }); const url = `${baseUrl}?${params.toString()}#checkin`; const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=390x390&margin=8&color=8c1d40&data=${encodeURIComponent(url)}`; $('qr').src = qrUrl; $('presentation-qr').src = qrUrl; updateSessionDetails(); }
+		function makeQr() { const baseUrl = publicBaseUrl || (location.protocol === 'http:' || location.protocol === 'https:' ? location.origin + location.pathname : location.href.split(/[?#]/)[0]); const params = new URLSearchParams({
+				session: sessionCode,
+				class: $('class-name').value,
+				room: $('room-name').value,
+				radius: $('radius').value,
+				sessionStartedAt: sessionStartedAt || sessionClientStartedAt || new Date().toISOString(),
+				lat: classroomLocation.latitude,
+				lng: classroomLocation.longitude
+			}); const url = `${baseUrl}?${params.toString()}#checkin`; const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=390x390&margin=8&color=8c1d40&data=${encodeURIComponent(url)}`; $('qr').src = qrUrl; $('presentation-qr').src = qrUrl; updateSessionDetails(); }
 		function distanceInMeters(latitude, longitude) { const earthRadius = 6371000; const toRadians = value => value * Math.PI / 180; const latitudeDelta = toRadians(latitude - classroomLocation.latitude); const longitudeDelta = toRadians(longitude - classroomLocation.longitude); const a = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(toRadians(classroomLocation.latitude)) * Math.cos(toRadians(latitude)) * Math.sin(longitudeDelta / 2) ** 2; return Math.round(earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))); }
 		function distanceLabel(distance) { return distance >= 1000 ? `${(distance / 1000).toFixed(1)} km` : `${distance} m`; }
 		function deviceToken() { let token = localStorage.getItem('rollcall-device-token'); if (!token) { token = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`; localStorage.setItem('rollcall-device-token', token); } return token; }
@@ -277,9 +323,59 @@
 		function setView(view) { if (view === 'dashboard' && !instructorAuthenticated) { showAuthGate(); return; } document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.view === view)); document.querySelectorAll('.view').forEach(section => section.classList.toggle('active', section.id === view)); if (view === 'checkin') { const params = new URLSearchParams(location.search); params.set('session', sessionCode); params.set('class', $('class-name').value); params.set('room', $('room-name').value); params.set('radius', $('radius').value); history.replaceState(null, '', `${location.pathname}?${params.toString()}#checkin`); } }
 		document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => setView(tab.dataset.view)));
 		$('auth-form').addEventListener('submit', event => { event.preventDefault(); if ($('instructor-password').value === 'InstrUct') { instructorAuthenticated = true; $('auth-gate').classList.add('hidden'); $('auth-error').classList.remove('show'); $('instructor-password').value = ''; toast('Instructor dashboard unlocked'); } else { $('auth-error').classList.add('show'); $('instructor-password').select(); } });
-		$('start-session').addEventListener('click', async event => { event.stopImmediatePropagation(); if (!rosterConfigured || enrolledCount < 1) { $('manage-roster').click(); toast('Create a roster before starting attendance'); return; } const button = $('start-session'); button.disabled = true; try { const session = await apiRequest('/api/sessions', { method: 'POST', body: JSON.stringify({ className: $('class-name').value, room: $('room-name').value, radius: $('radius').value, roster, requireRosterMatch }) }); applySession(session); history.replaceState(null, '', location.pathname); startServerPolling(); toast('New attendance session started'); } catch (error) { toast(error.message); } finally { button.disabled = false; } });
+		$('start-session').addEventListener('click', async event => {
+			event.stopImmediatePropagation();
+			if (!rosterConfigured || enrolledCount < 1) { $('manage-roster').click(); toast('Create a roster before starting attendance'); return; }
+
+			const button = $('start-session');
+			button.disabled = true;
+
+			sessionClientStartedAt = new Date().toISOString();
+			sessionStartedAt = sessionClientStartedAt;
+
+			const startSession = async () => {
+				try {
+					const session = await apiRequest('/api/sessions', {
+						method: 'POST',
+						body: JSON.stringify({
+							className: $('class-name').value,
+							room: $('room-name').value,
+							radius: $('radius').value,
+							roster,
+							requireRosterMatch,
+							clientStartedAt: sessionClientStartedAt,
+							latitude: classroomLocation.latitude,
+							longitude: classroomLocation.longitude
+						})
+					});
+					applySession(session);
+					history.replaceState(null, '', location.pathname);
+					startServerPolling();
+					toast('New attendance session started');
+				} catch (error) {
+					toast(error.message);
+				} finally {
+					button.disabled = false;
+				}
+			};
+
+			// Use the instructor device's location when available so the classroom
+			// coordinate is not tied to an old hard-coded location.
+			if ('geolocation' in navigator) {
+				navigator.geolocation.getCurrentPosition(position => {
+					classroomLocation = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+					classroomLocationSource = 'instructor';
+					startSession();
+				}, () => {
+					classroomLocationSource = 'default';
+					startSession();
+				}, { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 });
+			} else {
+				startSession();
+			}
+		});
 		$('end-session').addEventListener('click', async event => { if (!serverSession) return; event.stopImmediatePropagation(); try { await apiRequest(`/api/sessions/${encodeURIComponent(sessionCode)}/end`, { method: 'POST' }); sessionActive = false; $('session-status').textContent = 'ENDED'; $('session-status').style.color = '#a75b2e'; $('session-status').style.background = '#fff0e8'; toast('Attendance session ended'); } catch (error) { toast(error.message); } });
-		$('checkin-form').addEventListener('submit', async event => { event.preventDefault(); event.stopImmediatePropagation(); const name = $('student-name').value.trim(); if (!name) return; if (!serverSession) { showCheckinWarning('Connecting to the attendance session. Please try again in a moment.'); return; } if (!sessionActive) { showCheckinWarning('This attendance session is no longer active.'); return; } $('checkin-warning').classList.remove('show'); const button = $('checkin-button'); button.disabled = true; button.innerHTML = '<i data-lucide="loader-circle" style="width:15px;vertical-align:-3px"></i> Checking location...'; lucide.createIcons(); const submitCheckin = async distance => { try { const checkin = await apiRequest(`/api/sessions/${encodeURIComponent(sessionCode)}/checkins`, { method: 'POST', body: JSON.stringify({ name, distance, deviceToken: deviceToken(), timeZone: APP_TIME_ZONE }) }); records.unshift(checkin); renderRecords(); $('result').classList.remove('flag'); $('result').classList.add('show'); $('result-name').textContent = name; $('result-distance').textContent = `${checkin.distance} from classroom`; $('result-state').textContent = checkin.status === 'Present' ? 'ATTENDANCE RECORDED' : 'ATTENDANCE FLAGGED'; button.innerHTML = '<i data-lucide="check" style="width:15px;vertical-align:-3px"></i> Check-in recorded'; lucide.createIcons(); } catch (error) { showCheckinWarning(error.message); button.disabled = false; button.innerHTML = '<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in'; lucide.createIcons(); } }; if ('geolocation' in navigator) navigator.geolocation.getCurrentPosition(position => submitCheckin(distanceInMeters(position.coords.latitude, position.coords.longitude)), () => submitCheckin(0), { enableHighAccuracy: true, timeout: 10000 }); else submitCheckin(0); });
+		$('checkin-form').addEventListener('submit', async event => { event.preventDefault(); event.stopImmediatePropagation(); const name = $('student-name').value.trim(); if (!name) return; if (!serverSession) { showCheckinWarning('Connecting to the attendance session. Please try again in a moment.'); return; } if (!sessionActive) { showCheckinWarning('This attendance session is no longer active.'); return; } $('checkin-warning').classList.remove('show'); const button = $('checkin-button'); button.disabled = true; button.innerHTML = '<i data-lucide="loader-circle" style="width:15px;vertical-align:-3px"></i> Checking location...'; lucide.createIcons(); const submitCheckin = async distance => { try { const checkin = await apiRequest(`/api/sessions/${encodeURIComponent(sessionCode)}/checkins`, { method: 'POST', body: JSON.stringify({ name, distance, deviceToken: deviceToken(), timeZone: APP_TIME_ZONE }) }); records.unshift(checkin); renderRecords(); $('result').classList.remove('flag'); $('result').classList.add('show'); $('result-name').textContent = name; $('result-distance').textContent = `${checkin.distance} from classroom`; $('result-state').textContent = checkin.status === 'Present' ? 'ATTENDANCE RECORDED' : 'ATTENDANCE FLAGGED'; button.innerHTML = '<i data-lucide="check" style="width:15px;vertical-align:-3px"></i> Check-in recorded'; lucide.createIcons(); } catch (error) { showCheckinWarning(error.message); button.disabled = false; button.innerHTML = '<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in'; lucide.createIcons(); } }; if ('geolocation' in navigator) navigator.geolocation.getCurrentPosition(position => submitCheckin(distanceInMeters(position.coords.latitude, position.coords.longitude)), () => { showCheckinWarning('Unable to get your phone location. Please allow location access and try again.'); button.disabled = false; button.innerHTML = '<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in'; lucide.createIcons(); }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }); else { showCheckinWarning('Location is not available on this device.'); button.disabled = false; button.innerHTML = '<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in'; lucide.createIcons(); } });
 		function closeRoster() { $('roster-modal').classList.remove('open'); }
 		$('manage-roster').addEventListener('click', () => { $('class-size').value = enrolledCount || ''; $('roster-names').value = roster.join('\n'); $('require-roster-match').checked = requireRosterMatch; $('roster-modal').classList.add('open'); $('class-size').focus(); });
 		$('close-roster').addEventListener('click', closeRoster); $('cancel-roster').addEventListener('click', closeRoster);
@@ -292,7 +388,29 @@
 		document.addEventListener('keydown', event => { if (event.key === 'Escape') { $('presentation').classList.remove('open'); if (document.fullscreenElement) document.exitFullscreen?.(); } });
 		$('export').addEventListener('click', () => { const csv = ['Student,Time,Distance,Status', ...records.map(record => `${record.name},${record.time},${record.distance},${record.status}`)].join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); link.download = `attendance-${sessionCode}.csv`; link.click(); toast('CSV downloaded'); });
 		$('checkin-form').addEventListener('submit', event => { event.preventDefault(); const name = $('student-name').value.trim(); if (!name || !sessionActive) return; $('checkin-warning').classList.remove('show'); if (localStorage.getItem(checkinStorageKey())) { showCheckinWarning('This device has already submitted attendance for this session.'); return; } if (requireRosterMatch && !roster.some(rosterName => rosterName.toLowerCase() === name.toLowerCase())) { showCheckinWarning('That name is not on the class roster. Check the spelling or ask your instructor for help.'); return; } if (records.some(record => record.name.toLowerCase() === name.toLowerCase())) { showCheckinWarning('This name has already been recorded for this session. Please check with your instructor.'); return; } const button = $('checkin-button'); button.disabled = true; button.innerHTML = '<i data-lucide="loader-circle" style="width:15px;vertical-align:-3px"></i> Checking location...'; lucide.createIcons(); const finish = (distance, flagged) => { const formattedDistance = distanceLabel(distance); localStorage.setItem(checkinStorageKey(), JSON.stringify({ name, submittedAt: new Date().toISOString() })); records.unshift({ name, time: formatDateTime(new Date()), distance: formattedDistance, status: flagged ? 'Flagged' : 'Present' }); renderRecords(); $('result').classList.toggle('flag', flagged); $('result').classList.add('show'); $('result-name').textContent = name; $('result-distance').textContent = `${formattedDistance} from classroom`; $('result-state').textContent = flagged ? 'ATTENDANCE FLAGGED' : 'ATTENDANCE RECORDED'; button.innerHTML = '<i data-lucide="check" style="width:15px;vertical-align:-3px"></i> Check-in recorded'; lucide.createIcons(); }; const radius = Number($('radius').value); if ('geolocation' in navigator) navigator.geolocation.getCurrentPosition(position => { const distance = distanceInMeters(position.coords.latitude, position.coords.longitude); finish(distance, distance > radius); }, () => finish(37, false), { timeout: 3000 }); else finish(37, false); });
-		if (validSessionFromUrl) { const className = urlParams.get('class'); const roomName = urlParams.get('room'); if (className) $('class-name').value = className; if (roomName) $('room-name').value = roomName; if (urlParams.get('radius')) $('radius').value = urlParams.get('radius'); updateSessionDetails(className || $('class-name').value, roomName || $('room-name').value); refreshServerSession(); }
+		if (validSessionFromUrl) {
+			const className = urlParams.get('class');
+			const roomName = urlParams.get('room');
+			if (className) $('class-name').value = className;
+			if (roomName) $('room-name').value = roomName;
+			if (urlParams.get('radius')) $('radius').value = urlParams.get('radius');
+
+			const qrStartedAt = urlParams.get('sessionStartedAt');
+			if (qrStartedAt) {
+				sessionStartedAt = qrStartedAt;
+				sessionClientStartedAt = qrStartedAt;
+			}
+
+			const qrLat = Number(urlParams.get('lat'));
+			const qrLng = Number(urlParams.get('lng'));
+			if (Number.isFinite(qrLat) && Number.isFinite(qrLng)) {
+				classroomLocation = { latitude: qrLat, longitude: qrLng };
+				classroomLocationSource = 'qr';
+			}
+
+			updateSessionDetails(className || $('class-name').value, roomName || $('room-name').value);
+			refreshServerSession();
+		}
 		if (rosterConfigured && enrolledCount > 0) { $('enrolled-count').textContent = enrolledCount; $('enrolled-count').classList.remove('roster-needed'); } else if (!validSessionFromUrl) { $('session-status').textContent = 'SETUP REQUIRED'; $('session-status').style.color = 'var(--orange)'; $('session-status').style.background = '#fff0e8'; }
 		renderRecords(); makeQr(); setInterval(updateClock, 1000); updateClock(); lucide.createIcons();
 		if (location.hash === '#checkin' || new URLSearchParams(location.search).has('session')) { $('auth-gate').classList.add('hidden'); setView('checkin'); }
