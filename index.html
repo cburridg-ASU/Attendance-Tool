@@ -8,150 +8,995 @@
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 	<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 	<script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+
 	<style>
-		:root { --ink:#2a1a20; --muted:#716a6d; --line:#e4dfe0; --paper:#fbfaf8; --sage:#f5e9ed; --mint:#ffc627; --green:#8c1d40; --orange:#a15c00; --shadow:0 24px 70px rgba(54,23,35,.11); }
+		:root {
+			--ink:#2a1a20;
+			--muted:#716a6d;
+			--line:#e4dfe0;
+			--paper:#fbfaf8;
+			--sage:#f5e9ed;
+			--mint:#ffc627;
+			--green:#8c1d40;
+			--orange:#a15c00;
+			--shadow:0 24px 70px rgba(54,23,35,.11);
+		}
+
 		* { box-sizing:border-box; }
-		body { margin:0; min-height:100vh; color:var(--ink); background:var(--paper); font-family:Manrope, sans-serif; }
-		button, input, select { font:inherit; }
+
+		body {
+			margin:0;
+			min-height:100vh;
+			color:var(--ink);
+			background:var(--paper);
+			font-family:Manrope,sans-serif;
+		}
+
+		button,input,select { font:inherit; }
 		button { cursor:pointer; }
-		.shell { max-width:1320px; margin:auto; padding:26px 38px 48px; }
-		.topbar { display:flex; align-items:center; justify-content:space-between; padding-bottom:28px; border-bottom:1px solid var(--line); }
-		.brand { display:flex; align-items:center; gap:12px; font-weight:800; letter-spacing:-.04em; font-size:21px; }
-		.brand-mark { position:relative; width:35px; height:35px; display:grid; place-items:center; color:white; background:var(--ink); border-radius:10px; }
-		.brand-mark .brand-rabbit { width:22px; height:22px; }
-		.brand-mark .brand-lock { position:absolute; right:3px; bottom:3px; width:13px; height:13px; padding:1px; background:var(--ink); border-radius:3px; }
-		.top-note { color:var(--muted); font-size:12px; font-family:'DM Mono', monospace; letter-spacing:.02em; }
-		.hero { display:flex; justify-content:space-between; align-items:end; gap:24px; padding:46px 0 34px; }
-		.eyebrow { color:var(--green); font:500 11px 'DM Mono', monospace; text-transform:uppercase; letter-spacing:.12em; }
-		h1 { margin:11px 0 0; font-size:clamp(38px,5vw,68px); line-height:.98; letter-spacing:-.065em; max-width:700px; }
-		.hero-copy { color:var(--muted); max-width:430px; font-size:14px; line-height:1.7; margin:0 0 4px; }
-		.tabs { display:flex; gap:8px; padding:6px; margin-bottom:22px; width:max-content; background:#f3ecee; border-radius:14px; }
-		.tab { border:0; color:var(--muted); background:transparent; padding:11px 18px; border-radius:10px; font-size:13px; font-weight:700; }
-		.tab.active { color:var(--ink); background:white; box-shadow:0 3px 12px rgba(24,48,43,.08); }
-		.view { display:none; animation:rise .35s ease both; }
+
+		button:disabled {
+			cursor:not-allowed;
+			opacity:.48;
+			transform:none !important;
+			filter:none !important;
+		}
+
+		.shell {
+			max-width:1320px;
+			margin:auto;
+			padding:26px 38px 48px;
+		}
+
+		.topbar {
+			display:flex;
+			align-items:center;
+			justify-content:space-between;
+			padding-bottom:28px;
+			border-bottom:1px solid var(--line);
+		}
+
+		.brand {
+			display:flex;
+			align-items:center;
+			gap:12px;
+			font-weight:800;
+			letter-spacing:-.04em;
+			font-size:21px;
+		}
+
+		.brand-mark {
+			position:relative;
+			width:35px;
+			height:35px;
+			display:grid;
+			place-items:center;
+			color:white;
+			background:var(--ink);
+			border-radius:10px;
+		}
+
+		.brand-mark .brand-rabbit { width:22px;height:22px; }
+		.brand-mark .brand-lock {
+			position:absolute;
+			right:3px;
+			bottom:3px;
+			width:13px;
+			height:13px;
+			padding:1px;
+			background:var(--ink);
+			border-radius:3px;
+		}
+
+		.top-note {
+			color:var(--muted);
+			font-size:12px;
+			font-family:'DM Mono',monospace;
+			letter-spacing:.02em;
+		}
+
+		.hero {
+			display:flex;
+			justify-content:space-between;
+			align-items:end;
+			gap:24px;
+			padding:46px 0 34px;
+		}
+
+		.eyebrow {
+			color:var(--green);
+			font:500 11px 'DM Mono',monospace;
+			text-transform:uppercase;
+			letter-spacing:.12em;
+		}
+
+		h1 {
+			margin:11px 0 0;
+			font-size:clamp(38px,5vw,68px);
+			line-height:.98;
+			letter-spacing:-.065em;
+			max-width:700px;
+		}
+
+		.hero-copy {
+			color:var(--muted);
+			max-width:430px;
+			font-size:14px;
+			line-height:1.7;
+			margin:0 0 4px;
+		}
+
+		.tabs {
+			display:flex;
+			gap:8px;
+			padding:6px;
+			margin-bottom:22px;
+			width:max-content;
+			background:#f3ecee;
+			border-radius:14px;
+		}
+
+		.tab {
+			border:0;
+			color:var(--muted);
+			background:transparent;
+			padding:11px 18px;
+			border-radius:10px;
+			font-size:13px;
+			font-weight:700;
+		}
+
+		.tab.active {
+			color:var(--ink);
+			background:white;
+			box-shadow:0 3px 12px rgba(24,48,43,.08);
+		}
+
+		.view {
+			display:none;
+			animation:rise .35s ease both;
+		}
+
 		.view.active { display:block; }
-		.grid { display:grid; grid-template-columns:minmax(300px,.82fr) minmax(450px,1.35fr); gap:20px; align-items:stretch; }
-		.panel { background:white; border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); }
+
+		.grid {
+			display:grid;
+			grid-template-columns:minmax(300px,.82fr) minmax(450px,1.35fr);
+			gap:20px;
+			align-items:stretch;
+		}
+
+		.panel {
+			background:white;
+			border:1px solid var(--line);
+			border-radius:18px;
+			box-shadow:var(--shadow);
+		}
+
 		.panel-pad { padding:28px; }
-		.panel-head { display:flex; justify-content:space-between; align-items:flex-start; gap:15px; padding:25px 28px 18px; border-bottom:1px solid var(--line); }
-		.panel-title { margin:0; font-size:15px; letter-spacing:-.02em; }
-		.panel-sub { margin:5px 0 0; font-size:12px; color:var(--muted); }
-		.session-card { background:var(--ink); color:white; position:relative; overflow:hidden; }
-		.session-card:after { content:''; position:absolute; width:220px; height:220px; border:1px solid rgba(255,198,39,.25); border-radius:50%; right:-95px; bottom:-115px; }
+
+		.panel-head {
+			display:flex;
+			justify-content:space-between;
+			align-items:flex-start;
+			gap:15px;
+			padding:25px 28px 18px;
+			border-bottom:1px solid var(--line);
+		}
+
+		.panel-title {
+			margin:0;
+			font-size:15px;
+			letter-spacing:-.02em;
+		}
+
+		.panel-sub {
+			margin:5px 0 0;
+			font-size:12px;
+			color:var(--muted);
+		}
+
+		.session-card {
+			background:var(--ink);
+			color:white;
+			position:relative;
+			overflow:hidden;
+		}
+
+		.session-card:after {
+			content:'';
+			position:absolute;
+			width:220px;
+			height:220px;
+			border:1px solid rgba(255,198,39,.25);
+			border-radius:50%;
+			right:-95px;
+			bottom:-115px;
+		}
+
 		.session-card .eyebrow { color:#ffd75a; }
-		.session-card h2 { font-size:28px; letter-spacing:-.06em; margin:13px 0 26px; }
-		.field-label { display:block; color:var(--muted); font:500 10px 'DM Mono', monospace; text-transform:uppercase; letter-spacing:.12em; margin-bottom:9px; }
+
+		.session-card h2 {
+			font-size:28px;
+			letter-spacing:-.06em;
+			margin:13px 0 26px;
+		}
+
+		.field-label {
+			display:block;
+			color:var(--muted);
+			font:500 10px 'DM Mono',monospace;
+			text-transform:uppercase;
+			letter-spacing:.12em;
+			margin-bottom:9px;
+		}
+
 		.session-card .field-label { color:#c7aab5; }
-		.input, select { width:100%; border:1px solid var(--line); border-radius:9px; background:#fff; color:var(--ink); padding:12px 13px; outline:none; }
-		.input:focus, select:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(140,29,64,.11); }
-		.session-card .input, .session-card select { color:white; background:#4a2232; border-color:#7a4b5d; }
-		.form-row { display:grid; grid-template-columns:1.4fr .8fr; gap:12px; }
+
+		.input,select {
+			width:100%;
+			border:1px solid var(--line);
+			border-radius:9px;
+			background:#fff;
+			color:var(--ink);
+			padding:12px 13px;
+			outline:none;
+		}
+
+		.input:focus,select:focus {
+			border-color:var(--green);
+			box-shadow:0 0 0 3px rgba(140,29,64,.11);
+		}
+
+		.session-card .input,
+		.session-card select {
+			color:white;
+			background:#4a2232;
+			border-color:#7a4b5d;
+		}
+
+		.form-row {
+			display:grid;
+			grid-template-columns:1.4fr .8fr;
+			gap:12px;
+		}
+
 		.form-group { margin-bottom:17px; }
-		.primary, .secondary, .danger { border:0; border-radius:9px; padding:13px 16px; font-size:12px; font-weight:800; transition:transform .15s, filter .15s; }
-		.primary:hover, .secondary:hover, .danger:hover { transform:translateY(-1px); filter:brightness(1.03); }
-		.primary { color:var(--ink); background:var(--mint); }
-		.secondary { color:var(--ink); background:#f5edef; border:1px solid var(--line); }
-		.danger { color:#9b4d27; background:#fff1eb; }
+
+		.primary,.secondary,.danger {
+			border:0;
+			border-radius:9px;
+			padding:13px 16px;
+			font-size:12px;
+			font-weight:800;
+			transition:transform .15s,filter .15s;
+		}
+
+		.primary:hover,.secondary:hover,.danger:hover {
+			transform:translateY(-1px);
+			filter:brightness(1.03);
+		}
+
+		.primary {
+			color:var(--ink);
+			background:var(--mint);
+		}
+
+		.secondary {
+			color:var(--ink);
+			background:#f5edef;
+			border:1px solid var(--line);
+		}
+
+		.danger {
+			color:#9b4d27;
+			background:#fff1eb;
+		}
+
 		.full { width:100%; }
-		.session-meta { display:grid; grid-template-columns:1fr 1fr; gap:13px; padding:20px 0 22px; margin-top:18px; border-top:1px solid #6a394b; }
-		.session-value { font-size:13px; color:#f7edf0; }
-		.qr-stage { display:grid; place-items:center; padding:26px 0 15px; }
-		#qr { display:block; width:190px; height:190px; padding:12px; background:white; border-radius:13px; }
-		.code { text-align:center; color:#8c1d40; font:500 21px 'DM Mono', monospace; letter-spacing:.14em; }
-		.expires { display:flex; align-items:center; justify-content:center; gap:7px; color:#8e8589; font-size:11px; margin-top:10px; }
-		.expires strong { color:white; font-family:'DM Mono', monospace; }
-		.status { display:inline-flex; align-items:center; gap:7px; font-size:11px; font-weight:700; padding:6px 9px; border-radius:20px; color:var(--green); background:var(--sage); white-space:nowrap; }
-		.status:before { content:''; width:6px; height:6px; border-radius:50%; background:#ffc627; box-shadow:0 0 0 3px #f9e6a7; }
-		.stats { display:grid; grid-template-columns:repeat(3,1fr); border-bottom:1px solid var(--line); }
-		.stat { padding:22px 25px; border-right:1px solid var(--line); }
+
+		.session-meta {
+			display:grid;
+			grid-template-columns:1fr 1fr;
+			gap:13px;
+			padding:20px 0 22px;
+			margin-top:18px;
+			border-top:1px solid #6a394b;
+		}
+
+		.session-value {
+			font-size:13px;
+			color:#f7edf0;
+		}
+
+		.qr-stage {
+			display:grid;
+			place-items:center;
+			padding:26px 0 15px;
+		}
+
+		#qr {
+			display:block;
+			width:190px;
+			height:190px;
+			padding:12px;
+			background:white;
+			border-radius:13px;
+		}
+
+		.code {
+			text-align:center;
+			color:#8c1d40;
+			font:500 21px 'DM Mono',monospace;
+			letter-spacing:.14em;
+		}
+
+		.expires {
+			display:flex;
+			align-items:center;
+			justify-content:center;
+			gap:7px;
+			color:#8e8589;
+			font-size:11px;
+			margin-top:10px;
+		}
+
+		.expires strong {
+			color:var(--ink);
+			font-family:'DM Mono',monospace;
+		}
+
+		.status {
+			display:inline-flex;
+			align-items:center;
+			gap:7px;
+			font-size:11px;
+			font-weight:700;
+			padding:6px 9px;
+			border-radius:20px;
+			color:var(--green);
+			background:var(--sage);
+			white-space:nowrap;
+		}
+
+		.status:before {
+			content:'';
+			width:6px;
+			height:6px;
+			border-radius:50%;
+			background:#ffc627;
+			box-shadow:0 0 0 3px #f9e6a7;
+		}
+
+		.stats {
+			display:grid;
+			grid-template-columns:repeat(3,1fr);
+			border-bottom:1px solid var(--line);
+		}
+
+		.stat {
+			padding:22px 25px;
+			border-right:1px solid var(--line);
+		}
+
 		.stat:last-child { border:0; }
-		.stat-number { font-size:26px; font-weight:800; letter-spacing:-.06em; }
-		.stat-number.roster-needed { color:var(--orange); font-size:13px; letter-spacing:0; line-height:1.35; }
-		.stat-name { color:var(--muted); font-size:11px; margin-top:4px; }
+
+		.stat-number {
+			font-size:26px;
+			font-weight:800;
+			letter-spacing:-.06em;
+		}
+
+		.stat-number.roster-needed {
+			color:var(--orange);
+			font-size:13px;
+			letter-spacing:0;
+			line-height:1.35;
+		}
+
+		.stat-name {
+			color:var(--muted);
+			font-size:11px;
+			margin-top:4px;
+		}
+
 		.table-wrap { overflow-x:auto; }
-		table { width:100%; border-collapse:collapse; font-size:12px; min-width:590px; }
-		th { padding:14px 25px; color:var(--muted); text-align:left; font:500 10px 'DM Mono', monospace; text-transform:uppercase; letter-spacing:.08em; border-bottom:1px solid var(--line); }
-		td { padding:15px 25px; border-bottom:1px solid #edf2ef; white-space:nowrap; }
+
+		table {
+			width:100%;
+			border-collapse:collapse;
+			font-size:12px;
+			min-width:590px;
+		}
+
+		th {
+			padding:14px 25px;
+			color:var(--muted);
+			text-align:left;
+			font:500 10px 'DM Mono',monospace;
+			text-transform:uppercase;
+			letter-spacing:.08em;
+			border-bottom:1px solid var(--line);
+		}
+
+		td {
+			padding:15px 25px;
+			border-bottom:1px solid #edf2ef;
+			white-space:nowrap;
+		}
+
 		tbody tr:last-child td { border-bottom:0; }
-		.student { display:flex; align-items:center; gap:10px; font-weight:700; }
-		.avatar { display:grid; place-items:center; width:27px; height:27px; border-radius:50%; color:var(--green); background:var(--sage); font-size:10px; }
-		.pill { font-size:10px; font-weight:800; padding:5px 8px; border-radius:20px; }
-		.present { color:var(--green); background:var(--sage); }
-		.flagged { color:#a75b2e; background:#fff0e8; }
-		.table-foot { display:flex; justify-content:space-between; align-items:center; gap:15px; padding:18px 25px; border-top:1px solid var(--line); }
-		.micro { color:var(--muted); font:11px 'DM Mono', monospace; }
-		.checkin-layout { max-width:760px; margin:0 auto; }
-		.checkin-panel { display:grid; grid-template-columns:1fr 1fr; overflow:hidden; }
-		.checkin-intro { color:white; background:var(--ink); padding:44px; }
-		.checkin-intro h2 { margin:13px 0 18px; font-size:35px; letter-spacing:-.07em; line-height:1; }
-		.checkin-intro p { color:#d9c3ca; font-size:13px; line-height:1.7; }
-		.location-note { display:flex; gap:10px; margin-top:46px; padding-top:18px; border-top:1px solid #6a394b; color:#efdde3; font-size:11px; line-height:1.5; }
-		.location-note i { flex:none; width:15px; }
+
+		.student {
+			display:flex;
+			align-items:center;
+			gap:10px;
+			font-weight:700;
+		}
+
+		.avatar {
+			display:grid;
+			place-items:center;
+			width:27px;
+			height:27px;
+			border-radius:50%;
+			color:var(--green);
+			background:var(--sage);
+			font-size:10px;
+		}
+
+		.pill {
+			font-size:10px;
+			font-weight:800;
+			padding:5px 8px;
+			border-radius:20px;
+		}
+
+		.present {
+			color:var(--green);
+			background:var(--sage);
+		}
+
+		.flagged {
+			color:#a75b2e;
+			background:#fff0e8;
+		}
+
+		.table-foot {
+			display:flex;
+			justify-content:space-between;
+			align-items:center;
+			gap:15px;
+			padding:18px 25px;
+			border-top:1px solid var(--line);
+		}
+
+		.micro {
+			color:var(--muted);
+			font:11px 'DM Mono',monospace;
+		}
+
+		.checkin-layout {
+			max-width:760px;
+			margin:0 auto;
+		}
+
+		.checkin-panel {
+			display:grid;
+			grid-template-columns:1fr 1fr;
+			overflow:hidden;
+		}
+
+		.checkin-intro {
+			color:white;
+			background:var(--ink);
+			padding:44px;
+		}
+
+		.checkin-intro h2 {
+			margin:13px 0 18px;
+			font-size:35px;
+			letter-spacing:-.07em;
+			line-height:1;
+		}
+
+		.checkin-intro p {
+			color:#d9c3ca;
+			font-size:13px;
+			line-height:1.7;
+		}
+
+		.location-note {
+			display:flex;
+			gap:10px;
+			margin-top:46px;
+			padding-top:18px;
+			border-top:1px solid #6a394b;
+			color:#efdde3;
+			font-size:11px;
+			line-height:1.5;
+		}
+
+		.location-note i { flex:none;width:15px; }
+
 		.checkin-form { padding:44px; }
-		.checkin-form h3 { margin:0 0 8px; font-size:19px; letter-spacing:-.04em; }
+
+		.checkin-form h3 {
+			margin:0 0 8px;
+			font-size:19px;
+			letter-spacing:-.04em;
+		}
+
 		.checkin-form .panel-sub { margin-bottom:29px; }
-		.result { display:none; padding:18px; margin-top:18px; border-radius:10px; background:var(--sage); }
-		.result.show { display:block; animation:rise .3s ease both; }
+
+		.result {
+			display:none;
+			padding:18px;
+			margin-top:18px;
+			border-radius:10px;
+			background:var(--sage);
+		}
+
+		.result.show {
+			display:block;
+			animation:rise .3s ease both;
+		}
+
 		.result.flag { background:#fff0e8; }
-		.result h4 { margin:0 0 12px; font-size:15px; }
-		.result-line { display:flex; align-items:center; gap:8px; margin:7px 0; color:#53685e; font-size:11px; }
-		.result-line i { width:14px; color:var(--green); }
+
+		.result h4 {
+			margin:0 0 12px;
+			font-size:15px;
+		}
+
+		.result-line {
+			display:flex;
+			align-items:center;
+			gap:8px;
+			margin:7px 0;
+			color:#53685e;
+			font-size:11px;
+		}
+
+		.result-line i {
+			width:14px;
+			color:var(--green);
+		}
+
 		.result.flag .result-line i { color:var(--orange); }
-		.result-state { margin-top:15px; padding-top:13px; border-top:1px solid rgba(40,120,76,.16); color:var(--green); font:700 11px 'DM Mono', monospace; letter-spacing:.08em; }
-		.result.flag .result-state { color:#a75b2e; border-color:rgba(216,121,61,.2); }
-		.checkin-warning { display:none; margin-top:13px; padding:11px 12px; color:#8c1d40; background:#f5e9ed; border-radius:8px; font-size:11px; line-height:1.5; }
+
+		.result-state {
+			margin-top:15px;
+			padding-top:13px;
+			border-top:1px solid rgba(40,120,76,.16);
+			color:var(--green);
+			font:700 11px 'DM Mono',monospace;
+			letter-spacing:.08em;
+		}
+
+		.result.flag .result-state {
+			color:#a75b2e;
+			border-color:rgba(216,121,61,.2);
+		}
+
+		.checkin-warning {
+			display:none;
+			margin-top:13px;
+			padding:11px 12px;
+			color:#8c1d40;
+			background:#f5e9ed;
+			border-radius:8px;
+			font-size:11px;
+			line-height:1.5;
+		}
+
 		.checkin-warning.show { display:block; }
-		.presentation { display:none; position:fixed; inset:0; z-index:10; overflow:auto; color:white; background:var(--ink); }
-		.presentation.open { display:block; animation:rise .3s ease both; }
-		.presentation-inner { min-height:100vh; display:grid; place-items:center; padding:34px; text-align:center; }
-		.presentation-close { position:absolute; top:28px; right:30px; display:flex; align-items:center; gap:8px; color:#e0c7d0; background:transparent; border:1px solid #7a4b5d; border-radius:9px; padding:10px 13px; font-size:11px; }
-		.presentation-eyebrow { color:#ffd75a; font:500 12px 'DM Mono', monospace; letter-spacing:.14em; text-transform:uppercase; }
-		.presentation h2 { margin:14px 0 8px; font-size:clamp(34px,5vw,64px); letter-spacing:-.07em; }
-		.presentation-sub { color:#d9c3ca; margin:0 0 28px; font-size:14px; }
-		.presentation-qr { width:min(46vw,390px); height:min(46vw,390px); padding:22px; background:white; border-radius:18px; }
-		.presentation-code { margin-top:26px; color:#ffd75a; font:500 clamp(27px,4vw,46px) 'DM Mono', monospace; letter-spacing:.17em; }
-		.presentation-expiry { display:flex; justify-content:center; align-items:center; gap:8px; margin-top:12px; color:#d9c3ca; font-size:13px; }
-		.presentation-expiry strong { color:white; font:500 15px 'DM Mono', monospace; }
-		.presentation-hint { margin-top:42px; color:#aa8794; font-size:11px; }
-		.auth-gate { position:fixed; inset:0; z-index:20; display:grid; place-items:center; padding:24px; background:rgba(42,26,32,.94); }
+
+		.presentation {
+			display:none;
+			position:fixed;
+			inset:0;
+			z-index:10;
+			overflow:auto;
+			color:white;
+			background:var(--ink);
+		}
+
+		.presentation.open {
+			display:block;
+			animation:rise .3s ease both;
+		}
+
+		.presentation-inner {
+			min-height:100vh;
+			display:grid;
+			place-items:center;
+			padding:34px;
+			text-align:center;
+		}
+
+		.presentation-close {
+			position:absolute;
+			top:28px;
+			right:30px;
+			display:flex;
+			align-items:center;
+			gap:8px;
+			color:#e0c7d0;
+			background:transparent;
+			border:1px solid #7a4b5d;
+			border-radius:9px;
+			padding:10px 13px;
+			font-size:11px;
+		}
+
+		.presentation-eyebrow {
+			color:#ffd75a;
+			font:500 12px 'DM Mono',monospace;
+			letter-spacing:.14em;
+			text-transform:uppercase;
+		}
+
+		.presentation h2 {
+			margin:14px 0 8px;
+			font-size:clamp(34px,5vw,64px);
+			letter-spacing:-.07em;
+		}
+
+		.presentation-sub {
+			color:#d9c3ca;
+			margin:0 0 28px;
+			font-size:14px;
+		}
+
+		.presentation-qr {
+			width:min(46vw,390px);
+			height:min(46vw,390px);
+			padding:22px;
+			background:white;
+			border-radius:18px;
+		}
+
+		.presentation-code {
+			margin-top:26px;
+			color:#ffd75a;
+			font:500 clamp(27px,4vw,46px) 'DM Mono',monospace;
+			letter-spacing:.17em;
+		}
+
+		.presentation-expiry {
+			display:flex;
+			justify-content:center;
+			align-items:center;
+			gap:8px;
+			margin-top:12px;
+			color:#d9c3ca;
+			font-size:13px;
+		}
+
+		.presentation-expiry strong {
+			color:white;
+			font:500 15px 'DM Mono',monospace;
+		}
+
+		.presentation-hint {
+			margin-top:42px;
+			color:#aa8794;
+			font-size:11px;
+		}
+
+		.auth-gate {
+			position:fixed;
+			inset:0;
+			z-index:20;
+			display:grid;
+			place-items:center;
+			padding:24px;
+			background:rgba(42,26,32,.94);
+		}
+
 		.auth-gate.hidden { display:none; }
-		.auth-card { width:min(420px,100%); padding:36px; color:var(--ink); background:white; border-radius:18px; box-shadow:0 30px 100px rgba(0,0,0,.22); }
-		.auth-icon { display:grid; place-items:center; width:42px; height:42px; margin-bottom:24px; color:white; background:var(--ink); border-radius:12px; }
-		.auth-card h2 { margin:0 0 8px; font-size:25px; letter-spacing:-.06em; }
-		.auth-card p { margin:0 0 25px; color:var(--muted); font-size:12px; line-height:1.6; }
-		.auth-error { display:none; margin-top:11px; color:#a75b2e; font-size:11px; }
+
+		.auth-card {
+			width:min(420px,100%);
+			padding:36px;
+			color:var(--ink);
+			background:white;
+			border-radius:18px;
+			box-shadow:0 30px 100px rgba(0,0,0,.22);
+		}
+
+		.auth-icon {
+			display:grid;
+			place-items:center;
+			width:42px;
+			height:42px;
+			margin-bottom:24px;
+			color:white;
+			background:var(--ink);
+			border-radius:12px;
+		}
+
+		.auth-card h2 {
+			margin:0 0 8px;
+			font-size:25px;
+			letter-spacing:-.06em;
+		}
+
+		.auth-card p {
+			margin:0 0 25px;
+			color:var(--muted);
+			font-size:12px;
+			line-height:1.6;
+		}
+
+		.auth-error {
+			display:none;
+			margin-top:11px;
+			color:#a75b2e;
+			font-size:11px;
+		}
+
 		.auth-error.show { display:block; }
-		.roster-modal { position:fixed; inset:0; z-index:15; display:none; place-items:center; padding:24px; background:rgba(24,48,43,.72); }
-		.roster-modal.open { display:grid; animation:rise .25s ease both; }
-		.roster-card { width:min(620px,100%); max-height:min(720px,90vh); overflow:auto; padding:30px; background:white; border-radius:18px; box-shadow:0 30px 100px rgba(0,0,0,.22); }
-		.roster-head { display:flex; justify-content:space-between; align-items:flex-start; gap:15px; margin-bottom:24px; }
-		.roster-head h2 { margin:0 0 6px; font-size:22px; letter-spacing:-.06em; }
-		.close-icon { display:grid; place-items:center; width:32px; height:32px; color:var(--muted); background:#edf4ef; border:0; border-radius:8px; }
-		.roster-help { color:var(--muted); font-size:12px; line-height:1.6; }
-		.roster-textarea { width:100%; min-height:190px; resize:vertical; border:1px solid var(--line); border-radius:9px; padding:13px; color:var(--ink); outline:none; line-height:1.7; }
-		.roster-textarea:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(140,29,64,.11); }
-		.check-option { display:flex; align-items:flex-start; gap:10px; color:var(--ink); font-size:12px; line-height:1.5; }
-		.check-option input { width:16px; height:16px; margin:0; accent-color:var(--green); }
-		.roster-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
-		.empty { padding:44px 25px; text-align:center; color:var(--muted); }
-		.empty i { width:25px; height:25px; margin-bottom:8px; }
-		.toast { position:fixed; right:25px; bottom:25px; color:white; background:var(--ink); border-radius:9px; padding:13px 17px; font-size:12px; box-shadow:var(--shadow); transform:translateY(15px); opacity:0; pointer-events:none; transition:.25s; }
-		.toast.show { transform:none; opacity:1; }
-		@keyframes rise { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
-		@media (max-width:850px) { .shell { padding:20px 18px 35px; } .hero { display:block; padding:36px 0 27px; } .hero-copy { margin-top:20px; } .grid { grid-template-columns:1fr; } .checkin-panel { grid-template-columns:1fr; } .checkin-intro, .checkin-form { padding:30px; } .location-note { margin-top:30px; } }
-		@media (max-width:520px) { .top-note { display:none; } h1 { font-size:45px; } .tabs { width:100%; } .tab { flex:1; padding:11px 8px; } .stats { grid-template-columns:1fr 1fr; } .stat { padding:16px; } .stat:last-child { grid-column:span 2; border-top:1px solid var(--line); } .panel-head { padding:20px; } }
+
+		.roster-modal,
+		.history-modal {
+			position:fixed;
+			inset:0;
+			z-index:15;
+			display:none;
+			place-items:center;
+			padding:24px;
+			background:rgba(24,48,43,.72);
+		}
+
+		.roster-modal.open,
+		.history-modal.open {
+			display:grid;
+			animation:rise .25s ease both;
+		}
+
+		.roster-card,
+		.history-card {
+			width:min(700px,100%);
+			max-height:min(760px,90vh);
+			overflow:auto;
+			padding:30px;
+			background:white;
+			border-radius:18px;
+			box-shadow:0 30px 100px rgba(0,0,0,.22);
+		}
+
+		.roster-head {
+			display:flex;
+			justify-content:space-between;
+			align-items:flex-start;
+			gap:15px;
+			margin-bottom:24px;
+		}
+
+		.roster-head h2,
+		.history-head h2 {
+			margin:0 0 6px;
+			font-size:22px;
+			letter-spacing:-.06em;
+		}
+
+		.close-icon {
+			display:grid;
+			place-items:center;
+			width:32px;
+			height:32px;
+			color:var(--muted);
+			background:#edf4ef;
+			border:0;
+			border-radius:8px;
+			flex:none;
+		}
+
+		.roster-help {
+			color:var(--muted);
+			font-size:12px;
+			line-height:1.6;
+		}
+
+		.roster-textarea {
+			width:100%;
+			min-height:190px;
+			resize:vertical;
+			border:1px solid var(--line);
+			border-radius:9px;
+			padding:13px;
+			color:var(--ink);
+			outline:none;
+			line-height:1.7;
+		}
+
+		.roster-textarea:focus {
+			border-color:var(--green);
+			box-shadow:0 0 0 3px rgba(140,29,64,.11);
+		}
+
+		.check-option {
+			display:flex;
+			align-items:flex-start;
+			gap:10px;
+			color:var(--ink);
+			font-size:12px;
+			line-height:1.5;
+		}
+
+		.check-option input {
+			width:16px;
+			height:16px;
+			margin:0;
+			accent-color:var(--green);
+		}
+
+		.roster-actions {
+			display:flex;
+			justify-content:flex-end;
+			gap:8px;
+			margin-top:18px;
+		}
+
+		.saved-rosters {
+			display:grid;
+			gap:8px;
+			margin:0 0 22px;
+		}
+
+		.saved-roster {
+			display:flex;
+			align-items:center;
+			justify-content:space-between;
+			gap:12px;
+			padding:13px;
+			border:1px solid var(--line);
+			border-radius:10px;
+			background:#fbfaf8;
+		}
+
+		.saved-roster-info strong {
+			display:block;
+			font-size:12px;
+		}
+
+		.saved-roster-info span {
+			display:block;
+			margin-top:3px;
+			color:var(--muted);
+			font-size:10px;
+		}
+
+		.history-head {
+			display:flex;
+			justify-content:space-between;
+			align-items:flex-start;
+			gap:15px;
+			margin-bottom:22px;
+		}
+
+		.history-list {
+			display:grid;
+			gap:9px;
+		}
+
+		.history-item {
+			display:grid;
+			grid-template-columns:1fr auto;
+			gap:15px;
+			align-items:center;
+			padding:15px;
+			border:1px solid var(--line);
+			border-radius:10px;
+		}
+
+		.history-info strong {
+			display:block;
+			font-size:12px;
+		}
+
+		.history-info span {
+			display:block;
+			color:var(--muted);
+			font-size:10px;
+			margin-top:4px;
+		}
+
+		.history-actions {
+			display:flex;
+			gap:7px;
+		}
+
+		.empty {
+			padding:44px 25px;
+			text-align:center;
+			color:var(--muted);
+		}
+
+		.empty i {
+			width:25px;
+			height:25px;
+			margin-bottom:8px;
+		}
+
+		.toast {
+			position:fixed;
+			right:25px;
+			bottom:25px;
+			color:white;
+			background:var(--ink);
+			border-radius:9px;
+			padding:13px 17px;
+			font-size:12px;
+			box-shadow:var(--shadow);
+			transform:translateY(15px);
+			opacity:0;
+			pointer-events:none;
+			transition:.25s;
+			z-index:50;
+		}
+
+		.toast.show {
+			transform:none;
+			opacity:1;
+		}
+
+		@keyframes rise {
+			from { opacity:0;transform:translateY(8px); }
+			to { opacity:1;transform:none; }
+		}
+
+		@media (max-width:850px) {
+			.shell { padding:20px 18px 35px; }
+			.hero { display:block;padding:36px 0 27px; }
+			.hero-copy { margin-top:20px; }
+			.grid { grid-template-columns:1fr; }
+			.checkin-panel { grid-template-columns:1fr; }
+			.checkin-intro,.checkin-form { padding:30px; }
+			.location-note { margin-top:30px; }
+		}
+
+		@media (max-width:520px) {
+			.top-note { display:none; }
+			h1 { font-size:45px; }
+			.tabs { width:100%; }
+			.tab { flex:1;padding:11px 8px; }
+			.stats { grid-template-columns:1fr 1fr; }
+			.stat { padding:16px; }
+			.stat:last-child {
+				grid-column:span 2;
+				border-top:1px solid var(--line);
+			}
+			.panel-head { padding:20px; }
+			.history-item { grid-template-columns:1fr; }
+			.history-actions { justify-content:flex-start; }
+		}
 	</style>
 </head>
+
 <body>
 	<main class="shell">
 		<header class="topbar">
-			<div class="brand"><span class="brand-mark" aria-label="AttendanceRabbit logo"><i class="brand-rabbit" data-lucide="rabbit"></i><i class="brand-lock" data-lucide="lock-keyhole"></i></span> AttendanceRabbit</div>
-			<div class="top-note">CLASSROOM OPPERATIONS / 2026</div>
+			<div class="brand">
+				<span class="brand-mark" aria-label="AttendanceRabbit logo">
+					<i class="brand-rabbit" data-lucide="rabbit"></i>
+					<i class="brand-lock" data-lucide="lock-keyhole"></i>
+				</span>
+				AttendanceRabbit
+			</div>
+			<div class="top-note">CLASSROOM OPERATIONS / 2026</div>
 		</header>
+
 		<section class="hero">
-			<div><div class="eyebrow">Live classroom operations</div><h1>Attendance</em></h1></div>
+			<div>
+				<div class="eyebrow">Live classroom operations</div>
+				<h1>Attendance</h1>
+			</div>
 			<p class="hero-copy">Classroom check-in for instructors.</p>
 		</section>
+
 		<nav class="tabs" aria-label="Application view">
 			<button class="tab active" data-view="dashboard">Instructor dashboard</button>
 			<button class="tab" data-view="checkin">Student check-in</button>
@@ -159,314 +1004,2680 @@
 
 		<section id="dashboard" class="view active">
 			<div class="grid">
+
 				<article class="panel session-card panel-pad">
 					<div class="eyebrow">New attendance session</div>
 					<h2>Set the room,<br>then start attendance.</h2>
-					<div class="form-group"><label class="field-label" for="class-name">Classroom / course</label><input class="input" id="class-name" value="Engineering 101"></div>
-					<div class="form-row">
-						<div class="form-group"><label class="field-label" for="room-name">Room</label><input class="input" id="room-name" value="ECG 207"></div>
-						<div class="form-group"><label class="field-label" for="radius">Radius</label><select id="radius"><option value="100">100 m</option><option value="75">75 m</option><option value="150">150 m</option></select></div>
+
+					<div class="form-group">
+						<label class="field-label" for="class-name">Classroom / course</label>
+						<input class="input" id="class-name" value="Engineering 101">
 					</div>
-					<button class="primary full" id="start-session"><i data-lucide="play" style="width:14px;vertical-align:-3px"></i> Start attendance session</button>
-					<div class="session-meta"><div><span class="field-label">Session date</span><div class="session-value" id="session-date">Waiting for session time</div></div><div><span class="field-label">Duration</span><div class="session-value">15 minutes</div></div></div>
+
+					<div class="form-row">
+						<div class="form-group">
+							<label class="field-label" for="room-name">Room</label>
+							<input class="input" id="room-name" value="ECG 207">
+						</div>
+
+						<div class="form-group">
+							<label class="field-label" for="radius">Radius</label>
+							<select id="radius">
+								<option value="100">100 m</option>
+								<option value="75">75 m</option>
+								<option value="150">150 m</option>
+							</select>
+						</div>
+					</div>
+
+					<button class="primary full" id="start-session">
+						<i data-lucide="play" style="width:14px;vertical-align:-3px"></i>
+						Start attendance session
+					</button>
+
+					<div class="session-meta">
+						<div>
+							<span class="field-label">Session date</span>
+							<div class="session-value" id="session-date">Waiting for session time</div>
+						</div>
+						<div>
+							<span class="field-label">Duration</span>
+							<div class="session-value">15 minutes</div>
+						</div>
+					</div>
 				</article>
+
 				<article class="panel">
-					<div class="panel-head"><div><h2 class="panel-title" id="room-title">Engineering 101 · ECG 207</h2><p class="panel-sub">Session date unavailable</p></div><span class="status" id="session-status">ACTIVE</span></div>
-					<div class="qr-stage"><img id="qr" width="190" height="190" aria-label="Session QR code"><div class="code" id="session-code">X7K4P9</div><div class="expires"><i data-lucide="timer" style="width:13px"></i> Expires in <strong id="countdown">14:32</strong></div></div>
-					<div class="table-foot" style="border-top:1px solid var(--line)"><span class="micro">Scan to open student check-in</span><div style="display:flex;gap:8px"><button class="secondary" id="present-qr"><i data-lucide="monitor-up" style="width:13px;vertical-align:-3px"></i> Present QR</button><button class="danger" id="end-session"><i data-lucide="square" style="width:13px;vertical-align:-3px"></i> End session</button></div></div>
+					<div class="panel-head">
+						<div>
+							<h2 class="panel-title" id="room-title">Engineering 101 · ECG 207</h2>
+							<p class="panel-sub">Session date unavailable</p>
+						</div>
+						<span class="status" id="session-status" style="color:var(--orange);background:#fff0e8">SETUP REQUIRED</span>
+					</div>
+
+					<div class="qr-stage">
+						<img id="qr" width="190" height="190" aria-label="Session QR code">
+						<div class="code" id="session-code">------</div>
+
+						<div class="expires">
+							<i data-lucide="timer" style="width:13px"></i>
+							Expires in
+							<strong id="countdown">15:00</strong>
+						</div>
+					</div>
+
+					<div class="table-foot" style="border-top:1px solid var(--line)">
+						<span class="micro">Start a session to activate the QR code</span>
+
+						<div style="display:flex;gap:8px">
+							<button class="secondary" id="present-qr" disabled>
+								<i data-lucide="monitor-up" style="width:13px;vertical-align:-3px"></i>
+								Present QR
+							</button>
+
+							<button class="danger" id="end-session" disabled>
+								<i data-lucide="square" style="width:13px;vertical-align:-3px"></i>
+								End session
+							</button>
+						</div>
+					</div>
 				</article>
 			</div>
+
 			<article class="panel" style="margin-top:20px">
-				<div class="panel-head"><div><h2 class="panel-title">Attendance log</h2><p class="panel-sub">Submissions appear here as students check in.</p></div><div style="display:flex;gap:8px"><button class="secondary" id="manage-roster"><i data-lucide="users" style="width:14px;vertical-align:-3px"></i> Manage roster</button><button class="secondary" id="export"><i data-lucide="download" style="width:14px;vertical-align:-3px"></i> Export CSV</button></div></div>
-				<div class="stats"><div class="stat"><div class="stat-number" id="present-count">0</div><div class="stat-name">Present</div></div><div class="stat"><div class="stat-number" id="flagged-count">0</div><div class="stat-name">Flagged for review</div></div><div class="stat"><div class="stat-number roster-needed" id="enrolled-count">Roster needs to be created</div><div class="stat-name">Enrolled students</div></div></div>
-				<div class="table-wrap" id="attendance-table"><table><thead><tr><th>Student</th><th>Time</th><th>Distance</th><th>Status</th></tr></thead><tbody id="attendance-body"></tbody></table></div>
-				<div class="empty" id="empty-log" style="display:none"><i data-lucide="clipboard-list"></i><div>No check-ins yet. Start the session and share the QR code with students.</div></div>
+				<div class="panel-head">
+					<div>
+						<h2 class="panel-title">Attendance log</h2>
+						<p class="panel-sub">Submissions appear here as students check in.</p>
+					</div>
+
+					<div style="display:flex;gap:8px;flex-wrap:wrap">
+						<button class="secondary" id="manage-roster">
+							<i data-lucide="users" style="width:14px;vertical-align:-3px"></i>
+							Manage roster
+						</button>
+
+						<button class="secondary" id="history">
+							<i data-lucide="archive" style="width:14px;vertical-align:-3px"></i>
+							Saved attendance
+						</button>
+
+						<button class="secondary" id="export">
+							<i data-lucide="download" style="width:14px;vertical-align:-3px"></i>
+							Export CSV
+						</button>
+					</div>
+				</div>
+
+				<div class="stats">
+					<div class="stat">
+						<div class="stat-number" id="present-count">0</div>
+						<div class="stat-name">Present</div>
+					</div>
+
+					<div class="stat">
+						<div class="stat-number" id="flagged-count">0</div>
+						<div class="stat-name">Flagged for review</div>
+					</div>
+
+					<div class="stat">
+						<div class="stat-number roster-needed" id="enrolled-count">
+							Roster needs to be created
+						</div>
+						<div class="stat-name">Enrolled students</div>
+					</div>
+				</div>
+
+				<div class="table-wrap" id="attendance-table">
+					<table>
+						<thead>
+							<tr>
+								<th>Student</th>
+								<th>Time</th>
+								<th>Distance</th>
+								<th>Status</th>
+							</tr>
+						</thead>
+						<tbody id="attendance-body"></tbody>
+					</table>
+				</div>
+
+				<div class="empty" id="empty-log">
+					<i data-lucide="clipboard-list"></i>
+					<div>No check-ins yet. Start the session and share the QR code with students.</div>
+				</div>
 			</article>
 		</section>
 
 		<section id="checkin" class="view">
-			<div class="checkin-layout"><article class="panel checkin-panel"><div class="checkin-intro"><div class="eyebrow" id="checkin-classroom">Engineering 101 · ECG 207</div><h2>You're in<br>the right place.</h2><p>Confirm your name and we'll use your location to verify this check-in. Your location is only used for this attendance submission.</p><div class="location-note"><i data-lucide="map-pin"></i><span>Location permission is requested only when you press Check in.</span></div></div><div class="checkin-form"><h3>Check in to class</h3><p class="panel-sub">Session <strong id="checkin-session-code">X7K4P9</strong> · closes in <strong id="student-countdown">14:32</strong></p><form id="checkin-form"><div class="form-group"><label class="field-label" for="student-name">Your name</label><input class="input" id="student-name" placeholder="e.g. Jane Smith" required autocomplete="name"></div><button class="primary full" type="submit" id="checkin-button"><i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in</button><div class="checkin-warning" id="checkin-warning" role="alert"></div></form><div class="result" id="result"><h4 id="result-name">Jane Smith</h4><div class="result-line"><i data-lucide="check"></i> Attendance code valid</div><div class="result-line"><i data-lucide="check"></i> Submitted just now</div><div class="result-line"><i data-lucide="map-pin"></i> <span id="result-distance">37 meters from classroom</span></div><div class="result-state" id="result-state">ATTENDANCE RECORDED</div></div></div></article></div>
+			<div class="checkin-layout">
+				<article class="panel checkin-panel">
+					<div class="checkin-intro">
+						<div class="eyebrow" id="checkin-classroom">Engineering 101 · ECG 207</div>
+
+						<h2>You're in<br>the right place.</h2>
+
+						<p>
+							Confirm your name and we'll use your location to verify this check-in.
+							Your location is only used for this attendance submission.
+						</p>
+
+						<div class="location-note">
+							<i data-lucide="map-pin"></i>
+							<span>Location permission is requested only when you press Check in.</span>
+						</div>
+					</div>
+
+					<div class="checkin-form">
+						<h3>Check in to class</h3>
+
+						<p class="panel-sub">
+							Session <strong id="checkin-session-code">------</strong>
+							· closes in <strong id="student-countdown">15:00</strong>
+						</p>
+
+						<form id="checkin-form">
+							<div class="form-group">
+								<label class="field-label" for="student-name">Your name</label>
+								<input
+									class="input"
+									id="student-name"
+									placeholder="e.g. Jane Smith"
+									required
+									autocomplete="name"
+								>
+							</div>
+
+							<button class="primary full" type="submit" id="checkin-button">
+								<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i>
+								Check in
+							</button>
+
+							<div class="checkin-warning" id="checkin-warning" role="alert"></div>
+						</form>
+
+						<div class="result" id="result">
+							<h4 id="result-name">Jane Smith</h4>
+
+							<div class="result-line">
+								<i data-lucide="check"></i>
+								Attendance code valid
+							</div>
+
+							<div class="result-line">
+								<i data-lucide="check"></i>
+								Submitted just now
+							</div>
+
+							<div class="result-line">
+								<i data-lucide="map-pin"></i>
+								<span id="result-distance">37 meters from classroom</span>
+							</div>
+
+							<div class="result-state" id="result-state">
+								ATTENDANCE RECORDED
+							</div>
+						</div>
+					</div>
+				</article>
+			</div>
 		</section>
 	</main>
+
 	<section class="presentation" id="presentation" aria-label="Projected QR code">
-		<button class="presentation-close" id="close-presentation"><i data-lucide="x" style="width:15px"></i> Exit presentation</button>
-		<div class="presentation-inner"><div><div class="presentation-eyebrow">Scan to check in</div><h2 id="presentation-title">Engineering 101</h2><p class="presentation-sub" id="presentation-room">ECG 207 · September 22, 2026</p><img class="presentation-qr" id="presentation-qr" alt="Scan this QR code to check in"><div class="presentation-code" id="presentation-code">X7K4P9</div><div class="presentation-expiry"><i data-lucide="timer" style="width:15px"></i> Session closes in <strong id="presentation-countdown">14:32</strong></div><div class="presentation-hint">Open your camera and point it at the code</div></div></div>
+		<button class="presentation-close" id="close-presentation">
+			<i data-lucide="x" style="width:15px"></i>
+			Exit presentation
+		</button>
+
+		<div class="presentation-inner">
+			<div>
+				<div class="presentation-eyebrow">Scan to check in</div>
+				<h2 id="presentation-title">Engineering 101</h2>
+				<p class="presentation-sub" id="presentation-room">ECG 207 · Today</p>
+
+				<img
+					class="presentation-qr"
+					id="presentation-qr"
+					alt="Scan this QR code to check in"
+				>
+
+				<div class="presentation-code" id="presentation-code">------</div>
+
+				<div class="presentation-expiry">
+					<i data-lucide="timer" style="width:15px"></i>
+					Session closes in
+					<strong id="presentation-countdown">15:00</strong>
+				</div>
+
+				<div class="presentation-hint">
+					Open your camera and point it at the code
+				</div>
+			</div>
+		</div>
 	</section>
+
 	<section class="auth-gate" id="auth-gate" aria-label="Instructor access">
 		<form class="auth-card" id="auth-form">
-			<div class="auth-icon"><i data-lucide="lock-keyhole"></i></div>
+			<div class="auth-icon">
+				<i data-lucide="lock-keyhole"></i>
+			</div>
+
 			<h2>Instructor access</h2>
-			<p>The dashboard contains attendance records and session controls. Enter the instructor password to continue.</p>
-			<div class="form-group"><label class="field-label" for="instructor-password">Password</label><input class="input" id="instructor-password" type="password" autocomplete="current-password" placeholder="Enter instructor password" required></div>
-			<button class="primary full" type="submit"><i data-lucide="arrow-right" style="width:14px;vertical-align:-3px"></i> Open dashboard</button>
-			<div class="auth-error" id="auth-error">That password is not correct.</div>
+
+			<p>
+				The dashboard contains attendance records and session controls.
+				Enter the instructor password to continue.
+			</p>
+
+			<div class="form-group">
+				<label class="field-label" for="instructor-password">Password</label>
+				<input
+					class="input"
+					id="instructor-password"
+					type="password"
+					autocomplete="current-password"
+					placeholder="Enter instructor password"
+					required
+				>
+			</div>
+
+			<button class="primary full" type="submit">
+				<i data-lucide="arrow-right" style="width:14px;vertical-align:-3px"></i>
+				Open dashboard
+			</button>
+
+			<div class="auth-error" id="auth-error">
+				That password is not correct.
+			</div>
 		</form>
 	</section>
+
 	<section class="roster-modal" id="roster-modal" aria-label="Manage class roster">
 		<form class="roster-card" id="roster-form">
-			<div class="roster-head"><div><h2>Class roster</h2><p class="roster-help">Set the expected class size and optionally add one student name per line. Names make it easier to recognize attendance records later.</p></div><button class="close-icon" type="button" id="close-roster" aria-label="Close roster"><i data-lucide="x" style="width:16px"></i></button></div>
-			<div class="form-group"><label class="field-label" for="class-size">Enrolled class size</label><input class="input" id="class-size" type="number" min="1" max="500" value="48" required></div>
-			<div class="form-group"><label class="field-label" for="roster-names">Student names <span style="color:var(--muted);text-transform:none;letter-spacing:0">(optional)</span></label><textarea class="roster-textarea" id="roster-names" placeholder="Jane Smith&#10;Bob Jones&#10;Sarah Lee"></textarea></div>
-			<label class="check-option"><input id="require-roster-match" type="checkbox"><span>Require student names to match this roster before allowing check-in.</span></label>
-			<div class="roster-actions"><button class="secondary" type="button" id="cancel-roster">Cancel</button><button class="primary" type="submit"><i data-lucide="save" style="width:14px;vertical-align:-3px"></i> Save roster</button></div>
+			<div class="roster-head">
+				<div>
+					<h2>Class roster</h2>
+					<p class="roster-help">
+						Previously saved rosters are kept locally on this device.
+						You can reuse one for a new class or create a new roster.
+					</p>
+				</div>
+
+				<button
+					class="close-icon"
+					type="button"
+					id="close-roster"
+					aria-label="Close roster"
+				>
+					<i data-lucide="x" style="width:16px"></i>
+				</button>
+			</div>
+
+			<div id="saved-rosters-container"></div>
+
+			<div class="form-group">
+				<label class="field-label" for="roster-name">
+					Roster name
+				</label>
+
+				<input
+					class="input"
+					id="roster-name"
+					placeholder="e.g. Engineering 101 Fall 2026"
+				>
+			</div>
+
+			<div class="form-group">
+				<label class="field-label" for="class-size">
+					Enrolled class size
+				</label>
+
+				<input
+					class="input"
+					id="class-size"
+					type="number"
+					min="1"
+					max="500"
+					value="48"
+					required
+				>
+			</div>
+
+			<div class="form-group">
+				<label class="field-label" for="roster-names">
+					Student names
+					<span style="color:var(--muted);text-transform:none;letter-spacing:0">
+						(optional)
+					</span>
+				</label>
+
+				<textarea
+					class="roster-textarea"
+					id="roster-names"
+					placeholder="Jane Smith&#10;Bob Jones&#10;Sarah Lee"
+				></textarea>
+			</div>
+
+			<label class="check-option">
+				<input id="require-roster-match" type="checkbox">
+				<span>
+					Require student names to match this roster before allowing check-in.
+				</span>
+			</label>
+
+			<div class="roster-actions">
+				<button class="secondary" type="button" id="cancel-roster">
+					Cancel
+				</button>
+
+				<button class="primary" type="submit">
+					<i data-lucide="save" style="width:14px;vertical-align:-3px"></i>
+					Save roster
+				</button>
+			</div>
 		</form>
 	</section>
+
+	<section class="history-modal" id="history-modal" aria-label="Saved attendance sessions">
+		<div class="history-card">
+			<div class="history-head">
+				<div>
+					<h2>Saved attendance</h2>
+					<p class="roster-help">
+						Attendance sessions are cached locally on this device.
+						Export any previous session whenever you need it.
+					</p>
+				</div>
+
+				<button
+					class="close-icon"
+					type="button"
+					id="close-history"
+					aria-label="Close attendance history"
+				>
+					<i data-lucide="x" style="width:16px"></i>
+				</button>
+			</div>
+
+			<div class="history-list" id="history-list"></div>
+		</div>
+	</section>
+
 	<div class="toast" id="toast" role="status"></div>
+
 	<script>
-		const records = [];
+		/*
+		 * AttendanceRabbit
+		 *
+		 * Important architecture:
+		 * - The server is authoritative for active sessions.
+		 * - There is ONE start-session handler.
+		 * - There is ONE end-session handler.
+		 * - There is ONE student check-in handler.
+		 * - The countdown is calculated from the session start timestamp.
+		 * - LocalStorage caches rosters and completed attendance sessions.
+		*/
+
+		const API_BASE_URL = 'https://attendance-tool-mq9s.onrender.com';
+		const PUBLIC_BASE_URL = '';
+
+		const SESSION_DURATION_SECONDS = 15 * 60;
+		const APP_TIME_ZONE = 'America/Phoenix';
+
+		const STORAGE = {
+			rosters: 'attendance-rosters-v1',
+			activeRoster: 'attendance-active-roster-v1',
+			sessionHistory: 'attendance-session-history-v1',
+			deviceToken: 'attendance-device-token-v1'
+		};
+
 		const urlParams = new URLSearchParams(location.search);
 		const sessionFromUrl = urlParams.get('session');
-		const validSessionFromUrl = sessionFromUrl && /^[A-Z0-9]{6}$/.test(sessionFromUrl.toUpperCase());
-		// Rosters are intentionally session-only for now. A future instructor login/data system
-		// will replace this temporary behavior with persistent instructor-owned rosters.
+		const validSessionFromUrl =
+			sessionFromUrl &&
+			/^[A-Z0-9]{6}$/i.test(sessionFromUrl);
+
 		const isStudentCheckinPage = !!validSessionFromUrl;
-		if (!isStudentCheckinPage) {
-			localStorage.removeItem('rollcall-roster');
-			localStorage.removeItem('rollcall-roster-configured');
-			localStorage.removeItem('rollcall-enrolled-count');
-			localStorage.removeItem('rollcall-require-roster-match');
-		}
+
+		const records = [];
+
 		let roster = [];
 		let rosterConfigured = false;
 		let enrolledCount = 0;
 		let requireRosterMatch = false;
-		let sessionCode = 'X7K4P9'; let secondsLeft = 872; let sessionActive = rosterConfigured && enrolledCount > 0;
-		if (validSessionFromUrl) { sessionCode = sessionFromUrl.toUpperCase(); sessionActive = true; }
-		let instructorAuthenticated = false;
-		let classroomLocation = { latitude: 33.4219, longitude: -111.9341 };
-		let classroomLocationSource = 'default';
+
+		let sessionCode = validSessionFromUrl
+			? sessionFromUrl.toUpperCase()
+			: '';
+
+		let sessionActive = false;
+		let serverSession = false;
+
+		let sessionStartedAt = null;
+		let sessionExpiresAt = null;
 		let sessionClientStartedAt = null;
+
+		let classroomLocation = {
+			latitude: 33.4219,
+			longitude: -111.9341
+		};
+
+		let classroomLocationSource = 'default';
+
+		let instructorAuthenticated = false;
+		let instructorTimeZone = APP_TIME_ZONE;
+
+		let serverPollingInterval = null;
+		let countdownInterval = null;
+
+		const $ = id => document.getElementById(id);
+
 		function getPhoneTime() {
 			const now = new Date();
+
 			return {
 				iso: now.toISOString(),
-				time: now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-				date: now.toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' }),
-				timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'local'
+				time: now.toLocaleTimeString([], {
+					hour:'numeric',
+					minute:'2-digit'
+				}),
+				date: now.toLocaleDateString([], {
+					year:'numeric',
+					month:'long',
+					day:'numeric'
+				}),
+				timeZone:
+					Intl.DateTimeFormat().resolvedOptions().timeZone ||
+					'local'
 			};
 		}
-		const $ = id => document.getElementById(id);
-		function initials(name) { return name.split(' ').map(word => word[0]).join('').slice(0, 2).toUpperCase(); }
+
+		function initials(name) {
+			return name
+				.split(/\s+/)
+				.map(word => word[0])
+				.join('')
+				.slice(0,2)
+				.toUpperCase();
+		}
+
 		function formatDateTime(value, includeDate = false) {
 			if (!value) return '—';
-			const date = value instanceof Date ? value : new Date(value);
-			if (Number.isNaN(date.getTime())) return String(value);
+
+			const date =
+				value instanceof Date
+					? value
+					: new Date(value);
+
+			if (Number.isNaN(date.getTime())) {
+				return String(value);
+			}
+
 			const options = includeDate
-				? { timeZone: APP_TIME_ZONE, year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }
-				: { timeZone: APP_TIME_ZONE, hour: 'numeric', minute: '2-digit' };
-			return new Intl.DateTimeFormat('en-US', options).format(date);
+				? {
+					timeZone: instructorTimeZone,
+					year:'numeric',
+					month:'long',
+					day:'numeric',
+					hour:'numeric',
+					minute:'2-digit'
+				}
+				: {
+					timeZone: instructorTimeZone,
+					hour:'numeric',
+					minute:'2-digit'
+				};
+
+			return new Intl.DateTimeFormat(
+				'en-US',
+				options
+			).format(date);
 		}
+
 		function formatRecordTime(record) {
-			// Use the student's phone timestamp, but display that exact moment in the
-			// instructor's timezone. This avoids student/instructor timezone differences.
-			const clientTimestamp = record.clientTimestamp || record.clientTimestampUtc;
+			const clientTimestamp =
+				record.clientTimestamp ||
+				record.clientTimestampUtc;
+
 			if (clientTimestamp) {
 				const date = new Date(clientTimestamp);
+
 				if (!Number.isNaN(date.getTime())) {
-					return new Intl.DateTimeFormat('en-US', {
-						timeZone: instructorTimeZone,
-						hour: 'numeric',
-						minute: '2-digit'
-					}).format(date);
+					return new Intl.DateTimeFormat(
+						'en-US',
+						{
+							timeZone: instructorTimeZone,
+							hour:'numeric',
+							minute:'2-digit'
+						}
+					).format(date);
 				}
 			}
+
 			if (record.clientTime) return record.clientTime;
 			if (record.time) return record.time;
-			const timestamp = record.timestamp || record.createdAt || record.checkedInAt || record.submittedAt || record.checkinTime;
+
+			const timestamp =
+				record.timestamp ||
+				record.createdAt ||
+				record.checkedInAt ||
+				record.submittedAt ||
+				record.checkinTime;
+
 			if (timestamp) {
-				const date = new Date(new Date(timestamp).getTime() + instructorServerTimeOffsetMs);
-				if (!Number.isNaN(date.getTime())) return new Intl.DateTimeFormat('en-US', { timeZone: instructorTimeZone, hour: 'numeric', minute: '2-digit' }).format(date);
+				const date = new Date(timestamp);
+
+				if (!Number.isNaN(date.getTime())) {
+					return new Intl.DateTimeFormat(
+						'en-US',
+						{
+							timeZone: instructorTimeZone,
+							hour:'numeric',
+							minute:'2-digit'
+						}
+					).format(date);
+				}
 			}
-			return '—';
+
 			return '—';
 		}
+
 		function formatSessionDate(session) {
-			const timestamp = session.startedAt || session.createdAt || session.startTime || session.timestamp || session.date || session.clientStartedAt || sessionClientStartedAt;
-			if (timestamp) return formatDateTime(timestamp, true).replace(/,? \d{1,2}:\d{2} (AM|PM)$/i, '');
-			return '—';
+			const timestamp =
+				session.startedAt ||
+				session.createdAt ||
+				session.startTime ||
+				session.timestamp ||
+				session.date ||
+				session.clientStartedAt ||
+				sessionClientStartedAt;
+
+			if (!timestamp) return '—';
+
+			const formatted = formatDateTime(
+				timestamp,
+				true
+			);
+
+			return formatted.replace(
+				/,? \d{1,2}:\d{2} (AM|PM)$/i,
+				''
+			);
 		}
+
 		function renderRecords() {
-			$('attendance-body').innerHTML = records.map(record => `<tr><td><div class="student"><span class="avatar">${initials(record.name)}</span>${record.name}</div></td><td>${formatRecordTime(record)}</td><td>${record.distance}</td><td><span class="pill ${record.status === 'Present' ? 'present' : 'flagged'}">${record.status === 'Present' ? '✓ ' : '⚠ '}${record.status}</span></td></tr>`).join('');
-			$('present-count').textContent = records.filter(record => record.status === 'Present').length;
-			$('flagged-count').textContent = records.filter(record => record.status === 'Flagged').length;
-			$('attendance-table').style.display = records.length ? 'block' : 'none';
-			$('empty-log').style.display = records.length ? 'none' : 'block';
+			$('attendance-body').innerHTML =
+				records.map(record => `
+					<tr>
+						<td>
+							<div class="student">
+								<span class="avatar">
+									${initials(record.name)}
+								</span>
+								${escapeHtml(record.name)}
+							</div>
+						</td>
+
+						<td>${escapeHtml(formatRecordTime(record))}</td>
+						<td>${escapeHtml(record.distance || '—')}</td>
+
+						<td>
+							<span class="pill ${
+								record.status === 'Present'
+									? 'present'
+									: 'flagged'
+							}">
+								${record.status === 'Present' ? '✓ ' : '⚠ '}
+								${escapeHtml(record.status || 'Unknown')}
+							</span>
+						</td>
+					</tr>
+				`)
+				.join('');
+
+			$('present-count').textContent =
+				records.filter(
+					record => record.status === 'Present'
+				).length;
+
+			$('flagged-count').textContent =
+				records.filter(
+					record => record.status === 'Flagged'
+				).length;
+
+			$('attendance-table').style.display =
+				records.length ? 'block' : 'none';
+
+			$('empty-log').style.display =
+				records.length ? 'none' : 'block';
 		}
-		function updateClock() { const minutes = Math.floor(secondsLeft / 60).toString().padStart(2, '0'); const seconds = (secondsLeft % 60).toString().padStart(2, '0'); const time = `${minutes}:${seconds}`; $('countdown').textContent = time; $('student-countdown').textContent = time; $('presentation-countdown').textContent = time; if (secondsLeft > 0 && sessionActive) secondsLeft--; }
-		const publicBaseUrl = ''; // Set this to the deployed HTTPS URL, for example: https://attendance.example.com/index.html
-		const apiBaseUrl = 'https://attendance-tool-mq9s.onrender.com';
-		let serverSession = false;
-		let sessionStartedAt = null;
-		const APP_TIME_ZONE = 'America/Phoenix';
-		let instructorTimeZone = APP_TIME_ZONE;
-		let instructorServerTimeOffsetMs = 0;
-		async function apiRequest(path, options = {}) { const response = await fetch(`${apiBaseUrl}${path}`, { headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options }); const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.error || 'The attendance service is unavailable.'); return data; }
-		function applySession(session) {
-			serverSession = true;
-			sessionCode = session.code;
-			sessionActive = session.active;
-			secondsLeft = 900;
-			sessionStartedAt = session.startedAt || session.createdAt || session.startTime || session.timestamp || session.date || session.clientStartedAt || sessionClientStartedAt || null;
-			if (session.instructorTimeZone) instructorTimeZone = session.instructorTimeZone;
-			// If the server clock and instructor device clock differ, use the instructor's
-			// clock as the display reference so student check-in times are aligned to it.
-			if (session.startedAt && sessionClientStartedAt) {
-				const serverStart = new Date(session.startedAt).getTime();
-				const instructorStart = new Date(sessionClientStartedAt).getTime();
-				if (Number.isFinite(serverStart) && Number.isFinite(instructorStart)) {
-					instructorServerTimeOffsetMs = instructorStart - serverStart;
+
+		function escapeHtml(value) {
+			return String(value ?? '')
+				.replace(/&/g,'&amp;')
+				.replace(/</g,'&lt;')
+				.replace(/>/g,'&gt;')
+				.replace(/"/g,'&quot;')
+				.replace(/'/g,'&#039;');
+		}
+
+		function updateCountdown() {
+			if (!sessionActive || !sessionExpiresAt) {
+				setCountdownText(0);
+				return;
+			}
+
+			const remainingMs =
+				new Date(sessionExpiresAt).getTime() -
+				Date.now();
+
+			const remainingSeconds =
+				Math.max(
+					0,
+					Math.ceil(remainingMs / 1000)
+				);
+
+			setCountdownText(remainingSeconds);
+
+			if (remainingSeconds <= 0) {
+				sessionActive = false;
+				updateSessionControls();
+				updateSessionStatus();
+
+				if (serverPollingInterval) {
+					refreshServerSession();
+				}
+			}
+		}
+
+		function setCountdownText(totalSeconds) {
+			const safeSeconds =
+				Math.max(0, Number(totalSeconds) || 0);
+
+			const minutes =
+				Math.floor(safeSeconds / 60)
+					.toString()
+					.padStart(2,'0');
+
+			const seconds =
+				(safeSeconds % 60)
+					.toString()
+					.padStart(2,'0');
+
+			const value = `${minutes}:${seconds}`;
+
+			$('countdown').textContent = value;
+			$('student-countdown').textContent = value;
+			$('presentation-countdown').textContent = value;
+		}
+
+		function startCountdownClock() {
+			if (countdownInterval) {
+				clearInterval(countdownInterval);
+			}
+
+			updateCountdown();
+
+			countdownInterval =
+				setInterval(updateCountdown, 250);
+		}
+
+		function getSessionExpiration(session) {
+			if (session.expiresAt) {
+				const expires = new Date(
+					session.expiresAt
+				);
+
+				if (!Number.isNaN(expires.getTime())) {
+					return expires.toISOString();
 				}
 			}
 
-			const lat = Number(session.latitude ?? session.lat);
-			const lng = Number(session.longitude ?? session.lng);
-			if (Number.isFinite(lat) && Number.isFinite(lng)) {
-				classroomLocation = { latitude: lat, longitude: lng };
-				classroomLocationSource = 'session';
+			const started =
+				session.startedAt ||
+				session.createdAt ||
+				session.startTime ||
+				session.timestamp ||
+				session.date ||
+				session.clientStartedAt;
+
+			if (!started) return null;
+
+			const startDate = new Date(started);
+
+			if (Number.isNaN(startDate.getTime())) {
+				return null;
 			}
 
-			$('class-name').value = session.className;
-			$('room-name').value = session.room;
-			$('radius').value = session.radius;
+			return new Date(
+				startDate.getTime() +
+				SESSION_DURATION_SECONDS * 1000
+			).toISOString();
+		}
+
+		function setSessionTiming(session) {
+			const start =
+				session.startedAt ||
+				session.createdAt ||
+				session.startTime ||
+				session.timestamp ||
+				session.date ||
+				session.clientStartedAt ||
+				sessionClientStartedAt;
+
+			if (start) {
+				const date = new Date(start);
+
+				if (!Number.isNaN(date.getTime())) {
+					sessionStartedAt = date.toISOString();
+				}
+			}
+
+			const expiration =
+				getSessionExpiration(session);
+
+			if (expiration) {
+				sessionExpiresAt = expiration;
+			} else if (sessionStartedAt) {
+				sessionExpiresAt =
+					new Date(
+						new Date(sessionStartedAt).getTime() +
+						SESSION_DURATION_SECONDS * 1000
+					).toISOString();
+			}
+		}
+
+		function updateSessionControls() {
+			const active =
+				serverSession &&
+				sessionActive &&
+				!!sessionCode;
+
+			$('present-qr').disabled = !active;
+			$('end-session').disabled = !active;
+
+			const micro =
+				document.querySelector(
+					'.table-foot .micro'
+				);
+
+			if (micro) {
+				micro.textContent = active
+					? 'Scan to open student check-in'
+					: 'Start a session to activate the QR code';
+			}
+		}
+
+		function updateSessionStatus() {
+			const status = $('session-status');
+
+			if (!serverSession) {
+				status.textContent = 'SETUP REQUIRED';
+				status.style.color = 'var(--orange)';
+				status.style.background = '#fff0e8';
+				return;
+			}
+
+			if (sessionActive) {
+				status.textContent = 'ACTIVE';
+				status.style.color = '';
+				status.style.background = '';
+			} else {
+				status.textContent = 'ENDED';
+				status.style.color = '#a75b2e';
+				status.style.background = '#fff0e8';
+			}
+		}
+
+		function updateSessionDetails(
+			className = $('class-name').value,
+			roomName = $('room-name').value
+		) {
+			const classroom =
+				`${className} · ${roomName}`;
+
+			const sessionDate =
+				sessionStartedAt
+					? formatSessionDate({
+						startedAt:sessionStartedAt
+					})
+					: null;
+
+			$('room-title').textContent = classroom;
+			$('checkin-classroom').textContent = classroom;
+			$('presentation-title').textContent =
+				className;
+
+			$('presentation-room').textContent =
+				`${roomName} · ${sessionDate || 'Today'}`;
+
+			$('session-code').textContent =
+				sessionCode || '------';
+
+			$('checkin-session-code').textContent =
+				sessionCode || '------';
+
+			$('presentation-code').textContent =
+				sessionCode || '------';
+
+			$('session-date').textContent =
+				sessionDate ||
+				'Waiting for session time';
+
+			const panelSub =
+				document
+					.querySelector('#room-title')
+					?.closest('.panel-head')
+					?.querySelector('.panel-sub');
+
+			if (panelSub) {
+				panelSub.textContent =
+					sessionDate
+						? `Session date: ${sessionDate}`
+						: 'Session date unavailable';
+			}
+		}
+
+		function makeQr() {
+			if (!sessionCode || !serverSession) {
+				const blank =
+					'd%3A%2F%2Fexample.invalid';
+
+				$('qr').src =
+					`https://api.qrserver.com/v1/create-qr-code/?size=390x390&margin=8&color=8c1d40&data=${blank}`;
+
+				$('presentation-qr').src =
+					$('qr').src;
+
+				updateSessionDetails();
+				return;
+			}
+
+			const baseUrl =
+				PUBLIC_BASE_URL ||
+				(
+					location.protocol === 'http:' ||
+					location.protocol === 'https:'
+				)
+					? location.origin + location.pathname
+					: location.href.split(/[?#]/)[0];
+
+			const params =
+				new URLSearchParams({
+					session:sessionCode,
+					class:$('class-name').value,
+					room:$('room-name').value,
+					radius:$('radius').value,
+					sessionStartedAt:
+						sessionStartedAt ||
+						sessionClientStartedAt ||
+						new Date().toISOString(),
+					lat:classroomLocation.latitude,
+					lng:classroomLocation.longitude,
+					instructorTimeZone
+				});
+
+			const url =
+				`${baseUrl}?${params.toString()}#checkin`;
+
+			const qrUrl =
+				`https://api.qrserver.com/v1/create-qr-code/?size=390x390&margin=8&color=8c1d40&data=${encodeURIComponent(url)}`;
+
+			$('qr').src = qrUrl;
+			$('presentation-qr').src = qrUrl;
+
 			updateSessionDetails();
-			$('session-status').textContent = session.active ? 'ACTIVE' : 'ENDED';
-			$('session-status').style.color = session.active ? '' : '#a75b2e';
-			$('session-status').style.background = session.active ? '' : '#fff0e8';
-
-			records.splice(0, records.length, ...(session.checkins || []));
-			renderRecords();
-			makeQr();
 		}
-		let serverPollingInterval = null;
-		async function refreshServerSession() { if (!serverSession && !validSessionFromUrl) return; try { applySession(await apiRequest(`/api/sessions/${encodeURIComponent(sessionCode)}`)); } catch (error) { if (location.hash === '#checkin') showCheckinWarning(error.message); } }
-		function startServerPolling() { if (serverPollingInterval) clearInterval(serverPollingInterval); refreshServerSession(); serverPollingInterval = setInterval(() => { if (serverSession && sessionActive) refreshServerSession(); }, 2000); }
-		function updateSessionDetails(className = $('class-name').value, roomName = $('room-name').value) { const classroom = `${className} · ${roomName}`; const sessionDate = sessionStartedAt ? formatSessionDate({ startedAt: sessionStartedAt }) : null; $('room-title').textContent = classroom; $('checkin-classroom').textContent = classroom; $('presentation-title').textContent = className; $('presentation-room').textContent = `${roomName} · ${sessionDate || 'Today'}`; $('session-code').textContent = sessionCode; $('checkin-session-code').textContent = sessionCode; $('presentation-code').textContent = sessionCode; if ($('session-date')) $('session-date').textContent = sessionDate || 'Waiting for session time'; const panelSub = document.querySelector('#room-title')?.closest('.panel-head')?.querySelector('.panel-sub'); if (panelSub) panelSub.textContent = sessionDate ? `Session date: ${sessionDate}` : 'Session date unavailable'; }
-		function makeQr() { const baseUrl = publicBaseUrl || (location.protocol === 'http:' || location.protocol === 'https:' ? location.origin + location.pathname : location.href.split(/[?#]/)[0]); const params = new URLSearchParams({
-				session: sessionCode,
-				class: $('class-name').value,
-				room: $('room-name').value,
-				radius: $('radius').value,
-				sessionStartedAt: sessionStartedAt || sessionClientStartedAt || new Date().toISOString(),
-				lat: classroomLocation.latitude,
-				lng: classroomLocation.longitude,
-				instructorTimeZone
-			}); const url = `${baseUrl}?${params.toString()}#checkin`; const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=390x390&margin=8&color=8c1d40&data=${encodeURIComponent(url)}`; $('qr').src = qrUrl; $('presentation-qr').src = qrUrl; updateSessionDetails(); }
-		function distanceInMeters(latitude, longitude) { const earthRadius = 6371000; const toRadians = value => value * Math.PI / 180; const latitudeDelta = toRadians(latitude - classroomLocation.latitude); const longitudeDelta = toRadians(longitude - classroomLocation.longitude); const a = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(toRadians(classroomLocation.latitude)) * Math.cos(toRadians(latitude)) * Math.sin(longitudeDelta / 2) ** 2; return Math.round(earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))); }
-		function distanceLabel(distance) { return distance >= 1000 ? `${(distance / 1000).toFixed(1)} km` : `${distance} m`; }
-		function deviceToken() { let token = localStorage.getItem('rollcall-device-token'); if (!token) { token = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`; localStorage.setItem('rollcall-device-token', token); } return token; }
-		function checkinStorageKey() { return `rollcall-checkin-${sessionCode}-${deviceToken()}`; }
-		function showCheckinWarning(message) { $('checkin-warning').textContent = message; $('checkin-warning').classList.add('show'); }
-		function toast(message) { $('toast').textContent = message; $('toast').classList.add('show'); setTimeout(() => $('toast').classList.remove('show'), 2500); }
-		function showAuthGate() { $('auth-gate').classList.remove('hidden'); setTimeout(() => $('instructor-password').focus(), 0); }
-		function setView(view) { if (view === 'dashboard' && !instructorAuthenticated) { showAuthGate(); return; } document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.view === view)); document.querySelectorAll('.view').forEach(section => section.classList.toggle('active', section.id === view)); if (view === 'checkin') { const params = new URLSearchParams(location.search); params.set('session', sessionCode); params.set('class', $('class-name').value); params.set('room', $('room-name').value); params.set('radius', $('radius').value); history.replaceState(null, '', `${location.pathname}?${params.toString()}#checkin`); } }
-		document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => setView(tab.dataset.view)));
-		$('auth-form').addEventListener('submit', event => { event.preventDefault(); if ($('instructor-password').value === 'InstrUct') { instructorAuthenticated = true; $('auth-gate').classList.add('hidden'); $('auth-error').classList.remove('show'); $('instructor-password').value = ''; toast('Instructor dashboard unlocked'); } else { $('auth-error').classList.add('show'); $('instructor-password').select(); } });
-		$('start-session').addEventListener('click', async event => {
-			event.stopImmediatePropagation();
-			if (!rosterConfigured || enrolledCount < 1) { $('manage-roster').click(); toast('Create a roster before starting attendance'); return; }
 
-			const button = $('start-session');
-			button.disabled = true;
+		function distanceInMeters(
+			latitude,
+			longitude
+		) {
+			const earthRadius = 6371000;
 
-			sessionClientStartedAt = new Date().toISOString();
-			sessionStartedAt = sessionClientStartedAt;
-			instructorTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || APP_TIME_ZONE;
+			const toRadians =
+				value => value * Math.PI / 180;
 
-			const startSession = async () => {
-				try {
-					const session = await apiRequest('/api/sessions', {
-						method: 'POST',
-						body: JSON.stringify({
-							className: $('class-name').value,
-							room: $('room-name').value,
-							radius: $('radius').value,
-							roster,
-							requireRosterMatch,
-							clientStartedAt: sessionClientStartedAt,
-							instructorTimeZone,
-							latitude: classroomLocation.latitude,
-							longitude: classroomLocation.longitude
-						})
-					});
-					applySession(session);
-					history.replaceState(null, '', location.pathname);
-					startServerPolling();
-					toast('New attendance session started');
-				} catch (error) {
-					toast(error.message);
-				} finally {
-					button.disabled = false;
+			const latitudeDelta =
+				toRadians(
+					latitude -
+					classroomLocation.latitude
+				);
+
+			const longitudeDelta =
+				toRadians(
+					longitude -
+					classroomLocation.longitude
+				);
+
+			const a =
+				Math.sin(latitudeDelta / 2) ** 2 +
+				Math.cos(
+					toRadians(
+						classroomLocation.latitude
+					)
+				) *
+				Math.cos(
+					toRadians(latitude)
+				) *
+				Math.sin(longitudeDelta / 2) ** 2;
+
+			return Math.round(
+				earthRadius *
+				2 *
+				Math.atan2(
+					Math.sqrt(a),
+					Math.sqrt(1 - a)
+				)
+			);
+		}
+
+		function distanceLabel(distance) {
+			return distance >= 1000
+				? `${(distance / 1000).toFixed(1)} km`
+				: `${distance} m`;
+		}
+
+		function deviceToken() {
+			let token =
+				localStorage.getItem(
+					STORAGE.deviceToken
+				);
+
+			if (!token) {
+				token =
+					crypto.randomUUID
+						? crypto.randomUUID()
+						: `${Date.now()}-${Math.random()}`;
+
+				localStorage.setItem(
+					STORAGE.deviceToken,
+					token
+				);
+			}
+
+			return token;
+		}
+
+		function checkinStorageKey() {
+			return `attendance-checkin-${sessionCode}-${deviceToken()}`;
+		}
+
+		function showCheckinWarning(message) {
+			$('checkin-warning').textContent =
+				message;
+
+			$('checkin-warning')
+				.classList.add('show');
+		}
+
+		function toast(message) {
+			$('toast').textContent = message;
+			$('toast').classList.add('show');
+
+			setTimeout(
+				() =>
+					$('toast')
+						.classList.remove('show'),
+				2500
+			);
+		}
+
+		function showAuthGate() {
+			$('auth-gate')
+				.classList.remove('hidden');
+
+			setTimeout(
+				() =>
+					$('instructor-password').focus(),
+				0
+			);
+		}
+
+		function setView(view) {
+			if (
+				view === 'dashboard' &&
+				!instructorAuthenticated
+			) {
+				showAuthGate();
+				return;
+			}
+
+			document
+				.querySelectorAll('.tab')
+				.forEach(tab =>
+					tab.classList.toggle(
+						'active',
+						tab.dataset.view === view
+					)
+				);
+
+			document
+				.querySelectorAll('.view')
+				.forEach(section =>
+					section.classList.toggle(
+						'active',
+						section.id === view
+					)
+				);
+
+			if (view === 'checkin') {
+				const params =
+					new URLSearchParams(
+						location.search
+					);
+
+				if (sessionCode) {
+					params.set(
+						'session',
+						sessionCode
+					);
 				}
+
+				params.set(
+					'class',
+					$('class-name').value
+				);
+
+				params.set(
+					'room',
+					$('room-name').value
+				);
+
+				params.set(
+					'radius',
+					$('radius').value
+				);
+
+				history.replaceState(
+					null,
+					'',
+					`${location.pathname}?${params.toString()}#checkin`
+				);
+			}
+		}
+
+		/* -----------------------------
+		   Local storage
+		----------------------------- */
+
+		function readStorageArray(key) {
+			try {
+				const value =
+					JSON.parse(
+						localStorage.getItem(key) ||
+						'[]'
+					);
+
+				return Array.isArray(value)
+					? value
+					: [];
+			} catch {
+				return [];
+			}
+		}
+
+		function writeStorage(key, value) {
+			try {
+				localStorage.setItem(
+					key,
+					JSON.stringify(value)
+				);
+
+				return true;
+			} catch (error) {
+				console.warn(
+					'Unable to save local attendance data.',
+					error
+				);
+
+				return false;
+			}
+		}
+
+		function loadRosterCache() {
+			if (isStudentCheckinPage) return;
+
+			const active =
+				JSON.parse(
+					localStorage.getItem(
+						STORAGE.activeRoster
+					) || 'null'
+				);
+
+			if (active) {
+				roster =
+					Array.isArray(active.names)
+						? active.names
+						: [];
+
+				enrolledCount =
+					Number(active.enrolledCount) ||
+					roster.length ||
+					0;
+
+				requireRosterMatch =
+					!!active.requireRosterMatch;
+
+				rosterConfigured =
+					enrolledCount > 0;
+
+				updateRosterDisplay();
+			}
+		}
+
+		function saveRosterToCache({
+			name,
+			names,
+			enrolledCount,
+			requireRosterMatch
+		}) {
+			const rosters =
+				readStorageArray(
+					STORAGE.rosters
+				);
+
+			const cleanNames =
+				names
+					.map(name => name.trim())
+					.filter(Boolean);
+
+			const rosterRecord = {
+				id:
+					crypto.randomUUID
+						? crypto.randomUUID()
+						: `${Date.now()}-${Math.random()}`,
+				name:
+					name.trim() ||
+					'Unnamed roster',
+				names:cleanNames,
+				enrolledCount:Number(enrolledCount),
+				requireRosterMatch:!!requireRosterMatch,
+				savedAt:new Date().toISOString()
 			};
 
-			// Use the instructor device's location when available so the classroom
-			// coordinate is not tied to an old hard-coded location.
-			if ('geolocation' in navigator) {
-				navigator.geolocation.getCurrentPosition(position => {
-					classroomLocation = { latitude: position.coords.latitude, longitude: position.coords.longitude };
-					classroomLocationSource = 'instructor';
-					startSession();
-				}, () => {
-					classroomLocationSource = 'default';
-					startSession();
-				}, { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 });
-			} else {
-				startSession();
-			}
-		});
-		$('end-session').addEventListener('click', async event => { if (!serverSession) return; event.stopImmediatePropagation(); try { await apiRequest(`/api/sessions/${encodeURIComponent(sessionCode)}/end`, { method: 'POST' }); sessionActive = false; $('session-status').textContent = 'ENDED'; $('session-status').style.color = '#a75b2e'; $('session-status').style.background = '#fff0e8'; toast('Attendance session ended'); } catch (error) { toast(error.message); } });
-		$('checkin-form').addEventListener('submit', async event => { event.preventDefault(); event.stopImmediatePropagation(); const name = $('student-name').value.trim(); if (!name) return; if (!serverSession) { showCheckinWarning('Connecting to the attendance session. Please try again in a moment.'); return; } if (!sessionActive) { showCheckinWarning('This attendance session is no longer active.'); return; } $('checkin-warning').classList.remove('show'); const button = $('checkin-button'); button.disabled = true; button.innerHTML = '<i data-lucide="loader-circle" style="width:15px;vertical-align:-3px"></i> Checking location...'; lucide.createIcons(); const submitCheckin = async distance => { try { const clientTimestamp = new Date().toISOString(); const checkin = await apiRequest(`/api/sessions/${encodeURIComponent(sessionCode)}/checkins`, { method: 'POST', body: JSON.stringify({
-							name,
-						distance,
-						deviceToken: deviceToken(),
-						clientTimestamp,
-						clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'local',
-						instructorTimeZone
-					}) });
-				checkin.clientTimestamp = checkin.clientTimestamp || clientTimestamp;
-				checkin.clientTime = checkin.clientTime || new Intl.DateTimeFormat('en-US', { timeZone: instructorTimeZone, hour: 'numeric', minute: '2-digit' }).format(new Date(clientTimestamp));
-				records.unshift(checkin); renderRecords(); $('result').classList.remove('flag'); $('result').classList.add('show'); $('result-name').textContent = name; $('result-distance').textContent = `${checkin.distance} from classroom`; $('result-state').textContent = checkin.status === 'Present' ? 'ATTENDANCE RECORDED' : 'ATTENDANCE FLAGGED'; button.innerHTML = '<i data-lucide="check" style="width:15px;vertical-align:-3px"></i> Check-in recorded'; lucide.createIcons(); } catch (error) { showCheckinWarning(error.message); button.disabled = false; button.innerHTML = '<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in'; lucide.createIcons(); } }; if ('geolocation' in navigator) navigator.geolocation.getCurrentPosition(position => submitCheckin(distanceInMeters(position.coords.latitude, position.coords.longitude)), () => { showCheckinWarning('Unable to get your phone location. Please allow location access and try again.'); button.disabled = false; button.innerHTML = '<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in'; lucide.createIcons(); }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }); else { showCheckinWarning('Location is not available on this device.'); button.disabled = false; button.innerHTML = '<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in'; lucide.createIcons(); } });
-		function closeRoster() { $('roster-modal').classList.remove('open'); }
-		$('manage-roster').addEventListener('click', () => { $('class-size').value = enrolledCount || ''; $('roster-names').value = roster.join('\n'); $('require-roster-match').checked = requireRosterMatch; $('roster-modal').classList.add('open'); $('class-size').focus(); });
-		$('close-roster').addEventListener('click', closeRoster); $('cancel-roster').addEventListener('click', closeRoster);
-		$('roster-form').addEventListener('submit', event => { event.preventDefault(); roster = $('roster-names').value.split('\n').map(name => name.trim()).filter(Boolean); requireRosterMatch = $('require-roster-match').checked; enrolledCount = Number($('class-size').value); rosterConfigured = true; $('enrolled-count').textContent = enrolledCount; $('enrolled-count').classList.remove('roster-needed'); closeRoster(); toast(`Roster saved · ${enrolledCount} students enrolled`); });
-		$('roster-modal').addEventListener('click', event => { if (event.target === $('roster-modal')) closeRoster(); });
-		$('start-session').addEventListener('click', () => { if (!rosterConfigured || enrolledCount < 1) { $('manage-roster').click(); toast('Create a roster before starting attendance'); return; } sessionCode = Math.random().toString(36).slice(2, 8).toUpperCase(); secondsLeft = 900; sessionActive = true; $('session-status').textContent = 'ACTIVE'; $('session-status').style.color = ''; $('session-status').style.background = ''; updateSessionDetails(); makeQr(); toast('New attendance session started'); });
-		$('end-session').addEventListener('click', () => { sessionActive = false; $('session-status').textContent = 'ENDED'; $('session-status').style.color = '#a75b2e'; $('session-status').style.background = '#fff0e8'; toast('Attendance session ended'); });
-		$('present-qr').addEventListener('click', () => { $('presentation').classList.add('open'); document.documentElement.requestFullscreen?.().catch(() => {}); });
-		$('close-presentation').addEventListener('click', () => { $('presentation').classList.remove('open'); if (document.fullscreenElement) document.exitFullscreen?.(); });
-		document.addEventListener('keydown', event => { if (event.key === 'Escape') { $('presentation').classList.remove('open'); if (document.fullscreenElement) document.exitFullscreen?.(); } });
-		$('export').addEventListener('click', () => { const csv = ['Student,Time,Distance,Status', ...records.map(record => `${record.name},${formatRecordTime(record)},${record.distance},${record.status}`)].join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); link.download = `attendance-${sessionCode}.csv`; link.click(); toast('CSV downloaded'); });
-		$('checkin-form').addEventListener('submit', event => { event.preventDefault(); const name = $('student-name').value.trim(); if (!name || !sessionActive) return; $('checkin-warning').classList.remove('show'); if (localStorage.getItem(checkinStorageKey())) { showCheckinWarning('This device has already submitted attendance for this session.'); return; } if (requireRosterMatch && !roster.some(rosterName => rosterName.toLowerCase() === name.toLowerCase())) { showCheckinWarning('That name is not on the class roster. Check the spelling or ask your instructor for help.'); return; } if (records.some(record => record.name.toLowerCase() === name.toLowerCase())) { showCheckinWarning('This name has already been recorded for this session. Please check with your instructor.'); return; } const button = $('checkin-button'); button.disabled = true; button.innerHTML = '<i data-lucide="loader-circle" style="width:15px;vertical-align:-3px"></i> Checking location...'; lucide.createIcons(); const finish = (distance, flagged) => { const formattedDistance = distanceLabel(distance); localStorage.setItem(checkinStorageKey(), JSON.stringify({ name, submittedAt: new Date().toISOString() })); records.unshift({ name, time: formatDateTime(new Date()), distance: formattedDistance, status: flagged ? 'Flagged' : 'Present' }); renderRecords(); $('result').classList.toggle('flag', flagged); $('result').classList.add('show'); $('result-name').textContent = name; $('result-distance').textContent = `${formattedDistance} from classroom`; $('result-state').textContent = flagged ? 'ATTENDANCE FLAGGED' : 'ATTENDANCE RECORDED'; button.innerHTML = '<i data-lucide="check" style="width:15px;vertical-align:-3px"></i> Check-in recorded'; lucide.createIcons(); }; const radius = Number($('radius').value); if ('geolocation' in navigator) navigator.geolocation.getCurrentPosition(position => { const distance = distanceInMeters(position.coords.latitude, position.coords.longitude); finish(distance, distance > radius); }, () => finish(37, false), { timeout: 3000 }); else finish(37, false); });
-		if (validSessionFromUrl) {
-			const className = urlParams.get('class');
-			const roomName = urlParams.get('room');
-			if (className) $('class-name').value = className;
-			if (roomName) $('room-name').value = roomName;
-			if (urlParams.get('radius')) $('radius').value = urlParams.get('radius');
+			rosters.unshift(rosterRecord);
 
-			const qrTimeZone = urlParams.get('instructorTimeZone');
-			if (qrTimeZone) instructorTimeZone = qrTimeZone;
+			/*
+			 * Keep a useful local history without allowing
+			 * the cache to grow forever.
+			 */
+			const limited =
+				rosters.slice(0,25);
 
-			const qrStartedAt = urlParams.get('sessionStartedAt');
-			if (qrStartedAt) {
-				sessionStartedAt = qrStartedAt;
-				sessionClientStartedAt = qrStartedAt;
-			}
+			writeStorage(
+				STORAGE.rosters,
+				limited
+			);
 
-			const qrLat = Number(urlParams.get('lat'));
-			const qrLng = Number(urlParams.get('lng'));
-			if (Number.isFinite(qrLat) && Number.isFinite(qrLng)) {
-				classroomLocation = { latitude: qrLat, longitude: qrLng };
-				classroomLocationSource = 'qr';
-			}
+			writeStorage(
+				STORAGE.activeRoster,
+				rosterRecord
+			);
 
-			updateSessionDetails(className || $('class-name').value, roomName || $('room-name').value);
-			refreshServerSession();
+			return rosterRecord;
 		}
-		if (rosterConfigured && enrolledCount > 0) { $('enrolled-count').textContent = enrolledCount; $('enrolled-count').classList.remove('roster-needed'); } else if (!validSessionFromUrl) { $('session-status').textContent = 'SETUP REQUIRED'; $('session-status').style.color = 'var(--orange)'; $('session-status').style.background = '#fff0e8'; }
-		renderRecords(); makeQr(); setInterval(updateClock, 1000); updateClock(); lucide.createIcons();
-		if (location.hash === '#checkin' || new URLSearchParams(location.search).has('session')) { $('auth-gate').classList.add('hidden'); setView('checkin'); }
+
+		function updateRosterDisplay() {
+			const element =
+				$('enrolled-count');
+
+			if (
+				rosterConfigured &&
+				enrolledCount > 0
+			) {
+				element.textContent =
+					enrolledCount;
+
+				element.classList.remove(
+					'roster-needed'
+				);
+			} else {
+				element.textContent =
+					'Roster needs to be created';
+
+				element.classList.add(
+					'roster-needed'
+				);
+			}
+		}
+
+		function renderSavedRosters() {
+			const container =
+				$('saved-rosters-container');
+
+			const rosters =
+				readStorageArray(
+					STORAGE.rosters
+				);
+
+			if (!rosters.length) {
+				container.innerHTML = '';
+				return;
+			}
+
+			container.innerHTML = `
+				<div class="form-group">
+					<label class="field-label">
+						Previously saved rosters
+					</label>
+
+					<div class="saved-rosters">
+						${rosters.map(rosterRecord => `
+							<div class="saved-roster">
+								<div class="saved-roster-info">
+									<strong>
+										${escapeHtml(rosterRecord.name)}
+									</strong>
+
+									<span>
+										${rosterRecord.enrolledCount} enrolled
+										· saved ${escapeHtml(
+											formatDateTime(
+												rosterRecord.savedAt,
+												true
+											)
+										)}
+									</span>
+								</div>
+
+								<button
+									type="button"
+									class="secondary"
+									data-load-roster="${escapeHtml(rosterRecord.id)}"
+								>
+									Use roster
+								</button>
+							</div>
+						`).join('')}
+					</div>
+				</div>
+			`;
+
+			container
+				.querySelectorAll(
+					'[data-load-roster]'
+				)
+				.forEach(button => {
+					button.addEventListener(
+						'click',
+						() =>
+							loadSavedRoster(
+								button.dataset.loadRoster
+							)
+					);
+				});
+		}
+
+		function loadSavedRoster(id) {
+			const rosters =
+				readStorageArray(
+					STORAGE.rosters
+				);
+
+			const saved =
+				rosters.find(
+					item => item.id === id
+				);
+
+			if (!saved) return;
+
+			$('roster-name').value =
+				saved.name || '';
+
+			$('class-size').value =
+				saved.enrolledCount || '';
+
+			$('roster-names').value =
+				(saved.names || []).join('\n');
+
+			$('require-roster-match').checked =
+				!!saved.requireRosterMatch;
+
+			toast(
+				`Loaded ${saved.name || 'saved roster'}`
+			);
+		}
+
+		/* -----------------------------
+		   Attendance session cache
+		----------------------------- */
+
+		function cacheAttendanceSession() {
+			if (
+				!sessionCode ||
+				!serverSession
+			) {
+				return;
+			}
+
+			const history =
+				readStorageArray(
+					STORAGE.sessionHistory
+				);
+
+			const existingIndex =
+				history.findIndex(
+					item =>
+						item.sessionCode ===
+						sessionCode
+				);
+
+			const sessionRecord = {
+				sessionCode,
+				className:
+					$('class-name').value,
+				room:
+					$('room-name').value,
+				radius:
+					Number($('radius').value),
+				startedAt:
+					sessionStartedAt ||
+					new Date().toISOString(),
+				endedAt:
+					sessionActive
+						? null
+						: new Date().toISOString(),
+				active:sessionActive,
+				records:records.map(record => ({
+					...record
+				}))
+			};
+
+			if (existingIndex >= 0) {
+				history[existingIndex] = {
+					...history[existingIndex],
+					...sessionRecord
+				};
+			} else {
+				history.unshift(
+					sessionRecord
+				);
+			}
+
+			/*
+			 * Keep the most recent 100 local sessions.
+			 * This is a cache, not the permanent source of truth.
+			 */
+			writeStorage(
+				STORAGE.sessionHistory,
+				history.slice(0,100)
+			);
+		}
+
+		function loadCachedSessionRecords(code) {
+			const history =
+				readStorageArray(
+					STORAGE.sessionHistory
+				);
+
+			const cached =
+				history.find(
+					item =>
+						item.sessionCode === code
+				);
+
+			return cached
+				? cached.records || []
+				: [];
+		}
+
+		function renderHistory() {
+			const list =
+				$('history-list');
+
+			const history =
+				readStorageArray(
+					STORAGE.sessionHistory
+				);
+
+			if (!history.length) {
+				list.innerHTML = `
+					<div class="empty">
+						<i data-lucide="archive"></i>
+						<div>
+							No attendance sessions have been
+							cached on this device yet.
+						</div>
+					</div>
+				`;
+
+				lucide.createIcons();
+				return;
+			}
+
+			list.innerHTML =
+				history.map(item => `
+					<div class="history-item">
+						<div class="history-info">
+							<strong>
+								${escapeHtml(
+									item.className ||
+									'Attendance session'
+								)}
+								 ·
+								${escapeHtml(
+									item.room || ''
+								)}
+							</strong>
+
+							<span>
+								${escapeHtml(
+									item.sessionCode || ''
+								)}
+								·
+								${escapeHtml(
+									formatDateTime(
+										item.startedAt,
+										true
+									)
+								)}
+								·
+								${(item.records || []).length}
+								check-ins
+							</span>
+						</div>
+
+						<div class="history-actions">
+							<button
+								class="secondary"
+								type="button"
+								data-history-export="${escapeHtml(item.sessionCode)}"
+							>
+								<i data-lucide="download" style="width:13px;vertical-align:-3px"></i>
+								CSV
+							</button>
+						</div>
+					</div>
+				`)
+				.join('');
+
+			list
+				.querySelectorAll(
+					'[data-history-export]'
+				)
+				.forEach(button => {
+					button.addEventListener(
+						'click',
+						() =>
+							exportCachedSession(
+								button.dataset.historyExport
+							)
+					);
+				});
+
+			lucide.createIcons();
+		}
+
+		function exportCachedSession(code) {
+			const history =
+				readStorageArray(
+					STORAGE.sessionHistory
+				);
+
+			const session =
+				history.find(
+					item =>
+						item.sessionCode === code
+				);
+
+			if (!session) {
+				toast(
+					'Saved attendance session not found.'
+				);
+				return;
+			}
+
+			downloadCsv(
+				session.records || [],
+				session.sessionCode
+			);
+
+			toast(
+				'Saved attendance CSV downloaded'
+			);
+		}
+
+		/* -----------------------------
+		   API
+		----------------------------- */
+
+		async function apiRequest(
+			path,
+			options = {}
+		) {
+			const response =
+				await fetch(
+					`${API_BASE_URL}${path}`,
+					{
+						headers:{
+							'Content-Type':
+								'application/json',
+							...(options.headers || {})
+						},
+						...options
+					}
+				);
+
+			const data =
+				await response
+					.json()
+					.catch(() => ({}));
+
+			if (!response.ok) {
+				throw new Error(
+					data.error ||
+					'The attendance service is unavailable.'
+				);
+			}
+
+			return data;
+		}
+
+		function applySession(session) {
+			serverSession = true;
+
+			sessionCode =
+				String(session.code || '')
+					.toUpperCase();
+
+			sessionActive =
+				!!session.active;
+
+			if (
+				session.instructorTimeZone
+			) {
+				instructorTimeZone =
+					session.instructorTimeZone;
+			}
+
+			setSessionTiming(session);
+
+			const lat =
+				Number(
+					session.latitude ??
+					session.lat
+				);
+
+			const lng =
+				Number(
+					session.longitude ??
+					session.lng
+				);
+
+			if (
+				Number.isFinite(lat) &&
+				Number.isFinite(lng)
+			) {
+				classroomLocation = {
+					latitude:lat,
+					longitude:lng
+				};
+
+				classroomLocationSource =
+					'session';
+			}
+
+			if (session.className) {
+				$('class-name').value =
+					session.className;
+			}
+
+			if (session.room) {
+				$('room-name').value =
+					session.room;
+			}
+
+			if (session.radius) {
+				$('radius').value =
+					session.radius;
+			}
+
+			/*
+			 * IMPORTANT:
+			 *
+			 * Do NOT reset the timer to 900 here.
+			 * This function is called every 2 seconds by polling.
+			 * Resetting the timer here was the cause of the
+			 * 15:00 -> 14:59 -> 15:00 behavior.
+			 */
+			if (Array.isArray(session.checkins)) {
+				records.splice(
+					0,
+					records.length,
+					...session.checkins
+				);
+			}
+
+			updateSessionDetails();
+			updateSessionStatus();
+			updateSessionControls();
+			renderRecords();
+			makeQr();
+			startCountdownClock();
+
+			/*
+			 * Keep a local copy continuously updated.
+			 * This means the instructor doesn't have to manually
+			 * export after every class.
+			 */
+			cacheAttendanceSession();
+		}
+
+		async function refreshServerSession() {
+			if (
+				!serverSession &&
+				!validSessionFromUrl
+			) {
+				return;
+			}
+
+			try {
+				const session =
+					await apiRequest(
+						`/api/sessions/${encodeURIComponent(sessionCode)}`
+					);
+
+				applySession(session);
+			} catch (error) {
+				if (
+					location.hash === '#checkin'
+				) {
+					showCheckinWarning(
+						error.message
+					);
+				}
+			}
+		}
+
+		function startServerPolling() {
+			if (serverPollingInterval) {
+				clearInterval(
+					serverPollingInterval
+				);
+			}
+
+			refreshServerSession();
+
+			serverPollingInterval =
+				setInterval(() => {
+					if (
+						serverSession &&
+						sessionActive
+					) {
+						refreshServerSession();
+					}
+				},2000);
+		}
+
+		/* -----------------------------
+		   Navigation
+		----------------------------- */
+
+		document
+			.querySelectorAll('.tab')
+			.forEach(tab => {
+				tab.addEventListener(
+					'click',
+					() =>
+						setView(
+							tab.dataset.view
+						)
+				);
+			});
+
+		/* -----------------------------
+		   Instructor authentication
+		----------------------------- */
+
+		$('auth-form').addEventListener(
+			'submit',
+			event => {
+				event.preventDefault();
+
+				/*
+				 * Existing application password retained
+				 * for compatibility with the current app.
+				 * This should eventually move server-side.
+				 */
+				if (
+					$('instructor-password').value ===
+					'InstrUct'
+				) {
+					instructorAuthenticated =
+						true;
+
+					$('auth-gate')
+						.classList.add(
+							'hidden'
+						);
+
+					$('auth-error')
+						.classList.remove(
+							'show'
+						);
+
+					$('instructor-password')
+						.value = '';
+
+					toast(
+						'Instructor dashboard unlocked'
+					);
+				} else {
+					$('auth-error')
+						.classList.add(
+							'show'
+						);
+
+					$('instructor-password')
+						.select();
+				}
+			}
+		);
+
+		/* -----------------------------
+		   Start session
+		   SINGLE HANDLER
+		----------------------------- */
+
+		$('start-session').addEventListener(
+			'click',
+			async event => {
+				event.preventDefault();
+
+				if (
+					!rosterConfigured ||
+					enrolledCount < 1
+				) {
+					$('manage-roster').click();
+
+					toast(
+						'Create a roster before starting attendance'
+					);
+
+					return;
+				}
+
+				const button =
+					$('start-session');
+
+				button.disabled = true;
+
+				sessionClientStartedAt =
+					new Date().toISOString();
+
+				sessionStartedAt =
+					sessionClientStartedAt;
+
+				sessionExpiresAt =
+					new Date(
+						Date.now() +
+						SESSION_DURATION_SECONDS * 1000
+					).toISOString();
+
+				instructorTimeZone =
+					Intl.DateTimeFormat()
+						.resolvedOptions()
+						.timeZone ||
+					APP_TIME_ZONE;
+
+				const startServerSession =
+					async () => {
+						try {
+							const session =
+								await apiRequest(
+									'/api/sessions',
+									{
+										method:'POST',
+										body:JSON.stringify({
+											className:
+												$('class-name').value,
+											room:
+												$('room-name').value,
+											radius:
+												$('radius').value,
+											roster,
+											requireRosterMatch,
+											clientStartedAt:
+												sessionClientStartedAt,
+											instructorTimeZone,
+											latitude:
+												classroomLocation.latitude,
+											longitude:
+												classroomLocation.longitude
+										})
+									}
+								);
+
+							applySession(
+								session
+							);
+
+							history.replaceState(
+								null,
+								'',
+								location.pathname
+							);
+
+							startServerPolling();
+
+							toast(
+								'New attendance session started'
+							);
+						} catch (error) {
+							/*
+							 * If creation failed, don't leave the
+							 * UI looking like a live session.
+							 */
+							serverSession = false;
+							sessionActive = false;
+							sessionCode = '';
+							sessionStartedAt = null;
+							sessionExpiresAt = null;
+
+							updateSessionStatus();
+							updateSessionControls();
+							updateSessionDetails();
+							setCountdownText(0);
+
+							toast(
+								error.message
+							);
+						} finally {
+							button.disabled = false;
+						}
+					};
+
+				/*
+				 * Use instructor location when available.
+				 * Fall back to the existing default coordinate
+				 * if permission isn't granted.
+				 */
+				if (
+					'geolocation' in navigator
+				) {
+					navigator.geolocation.getCurrentPosition(
+						position => {
+							classroomLocation = {
+								latitude:
+									position.coords.latitude,
+								longitude:
+									position.coords.longitude
+							};
+
+							classroomLocationSource =
+								'instructor';
+
+							startServerSession();
+						},
+						() => {
+							classroomLocationSource =
+								'default';
+
+							startServerSession();
+						},
+						{
+							enableHighAccuracy:true,
+							timeout:8000,
+							maximumAge:60000
+						}
+					);
+				} else {
+					startServerSession();
+				}
+			}
+		);
+
+		/* -----------------------------
+		   End session
+		   SINGLE HANDLER
+		----------------------------- */
+
+		$('end-session').addEventListener(
+			'click',
+			async event => {
+				event.preventDefault();
+
+				if (
+					!serverSession ||
+					!sessionActive ||
+					!sessionCode
+				) {
+					return;
+				}
+
+				const button =
+					$('end-session');
+
+				button.disabled = true;
+
+				try {
+					await apiRequest(
+						`/api/sessions/${encodeURIComponent(sessionCode)}/end`,
+						{
+							method:'POST'
+						}
+					);
+
+					sessionActive = false;
+
+					cacheAttendanceSession();
+
+					updateSessionStatus();
+					updateSessionControls();
+					updateCountdown();
+
+					if (
+						serverPollingInterval
+					) {
+						clearInterval(
+							serverPollingInterval
+						);
+
+						serverPollingInterval =
+							null;
+					}
+
+					toast(
+						'Attendance session ended'
+					);
+				} catch (error) {
+					button.disabled = false;
+
+					toast(
+						error.message
+					);
+				}
+			}
+		);
+
+		/* -----------------------------
+		   Student check-in
+		   SINGLE HANDLER
+		----------------------------- */
+
+		$('checkin-form').addEventListener(
+			'submit',
+			async event => {
+				event.preventDefault();
+
+				const name =
+					$('student-name')
+						.value
+						.trim();
+
+				if (!name) return;
+
+				if (!serverSession) {
+					showCheckinWarning(
+						'Connecting to the attendance session. Please try again in a moment.'
+					);
+
+					return;
+				}
+
+				if (!sessionActive) {
+					showCheckinWarning(
+						'This attendance session is no longer active.'
+					);
+
+					return;
+				}
+
+				$('checkin-warning')
+					.classList.remove(
+						'show'
+					);
+
+				const button =
+					$('checkin-button');
+
+				button.disabled = true;
+
+				button.innerHTML =
+					'<i data-lucide="loader-circle" style="width:15px;vertical-align:-3px"></i> Checking location...';
+
+				lucide.createIcons();
+
+				const submitCheckin =
+					async distance => {
+						try {
+							const clientTimestamp =
+								new Date()
+									.toISOString();
+
+							const checkin =
+								await apiRequest(
+									`/api/sessions/${encodeURIComponent(sessionCode)}/checkins`,
+									{
+										method:'POST',
+										body:JSON.stringify({
+											name,
+											distance,
+											deviceToken:
+												deviceToken(),
+											clientTimestamp,
+											clientTimeZone:
+												Intl.DateTimeFormat()
+													.resolvedOptions()
+													.timeZone ||
+												'local',
+											instructorTimeZone
+										})
+									}
+								);
+
+							checkin.clientTimestamp =
+								checkin.clientTimestamp ||
+								clientTimestamp;
+
+							checkin.clientTime =
+								checkin.clientTime ||
+								new Intl.DateTimeFormat(
+									'en-US',
+									{
+										timeZone:
+											instructorTimeZone,
+										hour:'numeric',
+										minute:'2-digit'
+									}
+								).format(
+									new Date(
+										clientTimestamp
+									)
+								);
+
+							/*
+							 * Update the local copy immediately.
+							 */
+							const existingIndex =
+								records.findIndex(
+									record =>
+										record.name
+											?.toLowerCase() ===
+										name.toLowerCase()
+								);
+
+							if (
+								existingIndex >= 0
+							) {
+								records[
+									existingIndex
+								] = checkin;
+							} else {
+								records.unshift(
+									checkin
+								);
+							}
+
+							renderRecords();
+							cacheAttendanceSession();
+
+							$('result')
+								.classList.remove(
+									'flag'
+								);
+
+							if (
+								checkin.status !==
+								'Present'
+							) {
+								$('result')
+									.classList.add(
+										'flag'
+									);
+							}
+
+							$('result')
+								.classList.add(
+									'show'
+								);
+
+							$('result-name')
+								.textContent =
+								name;
+
+							$('result-distance')
+								.textContent =
+								`${checkin.distance} from classroom`;
+
+							$('result-state')
+								.textContent =
+								checkin.status ===
+								'Present'
+									? 'ATTENDANCE RECORDED'
+									: 'ATTENDANCE FLAGGED';
+
+							button.innerHTML =
+								'<i data-lucide="check" style="width:15px;vertical-align:-3px"></i> Check-in recorded';
+
+							lucide.createIcons();
+						} catch (error) {
+							showCheckinWarning(
+								error.message
+							);
+
+							button.disabled =
+								false;
+
+							button.innerHTML =
+								'<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in';
+
+							lucide.createIcons();
+						}
+					};
+
+				if (
+					'geolocation' in navigator
+				) {
+					navigator.geolocation.getCurrentPosition(
+						position =>
+							submitCheckin(
+								distanceInMeters(
+									position.coords.latitude,
+									position.coords.longitude
+								)
+							),
+						() => {
+							showCheckinWarning(
+								'Unable to get your phone location. Please allow location access and try again.'
+							);
+
+							button.disabled =
+								false;
+
+							button.innerHTML =
+								'<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in';
+
+							lucide.createIcons();
+						},
+						{
+							enableHighAccuracy:true,
+							timeout:15000,
+							maximumAge:0
+						}
+					);
+				} else {
+					showCheckinWarning(
+						'Location is not available on this device.'
+					);
+
+					button.disabled = false;
+
+					button.innerHTML =
+						'<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in';
+
+					lucide.createIcons();
+				}
+			}
+		);
+
+		/* -----------------------------
+		   Roster management
+		----------------------------- */
+
+		function closeRoster() {
+			$('roster-modal')
+				.classList.remove('open');
+		}
+
+		$('manage-roster').addEventListener(
+			'click',
+			() => {
+				renderSavedRosters();
+
+				$('roster-name').value = '';
+
+				$('class-size').value =
+					enrolledCount || '';
+
+				$('roster-names').value =
+					roster.join('\n');
+
+				$('require-roster-match')
+					.checked =
+					requireRosterMatch;
+
+				$('roster-modal')
+					.classList.add('open');
+
+				$('class-size').focus();
+			}
+		);
+
+		$('close-roster').addEventListener(
+			'click',
+			closeRoster
+		);
+
+		$('cancel-roster').addEventListener(
+			'click',
+			closeRoster
+		);
+
+		$('roster-form').addEventListener(
+			'submit',
+			event => {
+				event.preventDefault();
+
+				const names =
+					$('roster-names')
+						.value
+						.split('\n')
+						.map(name => name.trim())
+						.filter(Boolean);
+
+				const requestedClassSize =
+					Number(
+						$('class-size').value
+					);
+
+				if (
+					!Number.isFinite(
+						requestedClassSize
+					) ||
+					requestedClassSize < 1
+				) {
+					toast(
+						'Enter a valid class size.'
+					);
+
+					return;
+				}
+
+				requireRosterMatch =
+					$('require-roster-match')
+						.checked;
+
+				roster = names;
+
+				enrolledCount =
+					requestedClassSize;
+
+				rosterConfigured = true;
+
+				saveRosterToCache({
+					name:
+						$('roster-name')
+							.value ||
+						`${$('class-name').value} · ${$('room-name').value}`,
+					names,
+					enrolledCount,
+					requireRosterMatch
+				});
+
+				updateRosterDisplay();
+
+				closeRoster();
+
+				toast(
+					`Roster saved · ${enrolledCount} students enrolled`
+				);
+			}
+		);
+
+		$('roster-modal').addEventListener(
+			'click',
+			event => {
+				if (
+					event.target ===
+					$('roster-modal')
+				) {
+					closeRoster();
+				}
+			}
+		);
+
+		/* -----------------------------
+		   Attendance history
+		----------------------------- */
+
+		$('history').addEventListener(
+			'click',
+			() => {
+				renderHistory();
+
+				$('history-modal')
+					.classList.add('open');
+			}
+		);
+
+		$('close-history').addEventListener(
+			'click',
+			() => {
+				$('history-modal')
+					.classList.remove('open');
+			}
+		);
+
+		$('history-modal').addEventListener(
+			'click',
+			event => {
+				if (
+					event.target ===
+					$('history-modal')
+				) {
+					$('history-modal')
+						.classList.remove('open');
+				}
+			}
+		);
+
+		/* -----------------------------
+		   Presentation mode
+		----------------------------- */
+
+		$('present-qr').addEventListener(
+			'click',
+			() => {
+				if (
+					$('present-qr').disabled ||
+					!sessionActive
+				) {
+					return;
+				}
+
+				$('presentation')
+					.classList.add('open');
+
+				document
+					.documentElement
+					.requestFullscreen?.()
+					.catch(() => {});
+			}
+		);
+
+		$('close-presentation').addEventListener(
+			'click',
+			() => {
+				$('presentation')
+					.classList.remove('open');
+
+				if (
+					document.fullscreenElement
+				) {
+					document
+						.exitFullscreen?.();
+				}
+			}
+		);
+
+		document.addEventListener(
+			'keydown',
+			event => {
+				if (
+					event.key === 'Escape'
+				) {
+					$('presentation')
+						.classList.remove(
+							'open'
+						);
+
+					if (
+						document.fullscreenElement
+					) {
+						document
+							.exitFullscreen?.();
+					}
+				}
+			}
+		);
+
+		/* -----------------------------
+		   CSV export
+		----------------------------- */
+
+		function csvEscape(value) {
+			const stringValue =
+				String(value ?? '');
+
+			return `"${stringValue
+				.replace(/"/g,'""')}"`;
+		}
+
+		function downloadCsv(
+			recordsToExport,
+			code
+		) {
+			const rows = [
+				[
+					'Student',
+					'Time',
+					'Distance',
+					'Status'
+				],
+				...recordsToExport.map(
+					record => [
+						record.name,
+						formatRecordTime(record),
+						record.distance,
+						record.status
+					]
+				)
+			];
+
+			const csv =
+				rows
+					.map(row =>
+						row
+							.map(csvEscape)
+							.join(',')
+					)
+					.join('\n');
+
+			const link =
+				document.createElement('a');
+
+			link.href =
+				URL.createObjectURL(
+					new Blob(
+						[csv],
+						{
+							type:
+								'text/csv;charset=utf-8'
+						}
+					)
+				);
+
+			link.download =
+				`attendance-${code || 'session'}.csv`;
+
+			document.body.appendChild(link);
+			link.click();
+			link.remove();
+
+			setTimeout(
+				() =>
+					URL.revokeObjectURL(
+						link.href
+					),
+				1000
+			);
+		}
+
+		$('export').addEventListener(
+			'click',
+			() => {
+				if (records.length) {
+					downloadCsv(
+						records,
+						sessionCode ||
+						'current-session'
+					);
+
+					toast(
+						'CSV downloaded'
+					);
+
+					return;
+				}
+
+				/*
+				 * If the current session has no records,
+				 * offer the instructor the saved history instead
+				 * of downloading an empty CSV.
+				 */
+				const cached =
+					loadCachedSessionRecords(
+						sessionCode
+					);
+
+				if (cached.length) {
+					downloadCsv(
+						cached,
+						sessionCode
+					);
+
+					toast(
+						'Saved attendance CSV downloaded'
+					);
+
+					return;
+				}
+
+				toast(
+					'There are no attendance records to export.'
+				);
+			}
+		);
+
+		/* -----------------------------
+		   Student URL/session bootstrap
+		----------------------------- */
+
+		if (validSessionFromUrl) {
+			const className =
+				urlParams.get('class');
+
+			const roomName =
+				urlParams.get('room');
+
+			if (className) {
+				$('class-name').value =
+					className;
+			}
+
+			if (roomName) {
+				$('room-name').value =
+					roomName;
+			}
+
+			if (
+				urlParams.get('radius')
+			) {
+				$('radius').value =
+					urlParams.get('radius');
+			}
+
+			const qrTimeZone =
+				urlParams.get(
+					'instructorTimeZone'
+				);
+
+			if (qrTimeZone) {
+				instructorTimeZone =
+					qrTimeZone;
+			}
+
+			const qrStartedAt =
+				urlParams.get(
+					'sessionStartedAt'
+				);
+
+			if (qrStartedAt) {
+				sessionStartedAt =
+					qrStartedAt;
+
+				sessionClientStartedAt =
+					qrStartedAt;
+
+				sessionExpiresAt =
+					new Date(
+						new Date(qrStartedAt).getTime() +
+						SESSION_DURATION_SECONDS * 1000
+					).toISOString();
+			}
+
+			const qrLat =
+				Number(
+					urlParams.get('lat')
+				);
+
+			const qrLng =
+				Number(
+					urlParams.get('lng')
+				);
+
+			if (
+				Number.isFinite(qrLat) &&
+				Number.isFinite(qrLng)
+			) {
+				classroomLocation = {
+					latitude:qrLat,
+					longitude:qrLng
+				};
+
+				classroomLocationSource =
+					'qr';
+			}
+
+			updateSessionDetails(
+				className ||
+					$('class-name').value,
+				roomName ||
+					$('room-name').value
+			);
+
+			/*
+			 * Student pages should immediately ask the server
+			 * for the authoritative session state.
+			 */
+			startServerPolling();
+		}
+
+		/* -----------------------------
+		   Initial application state
+		----------------------------- */
+
+		if (!isStudentCheckinPage) {
+			loadRosterCache();
+		}
+
+		updateRosterDisplay();
+
+		updateSessionStatus();
+		updateSessionControls();
+
+		renderRecords();
+
+		updateSessionDetails();
+
+		setCountdownText(0);
+
+		/*
+		 * Empty QR state until a real server session exists.
+		 */
+		makeQr();
+
+		startCountdownClock();
+
+		lucide.createIcons();
+
+		/*
+		 * Student QR links open directly into check-in.
+		 * Instructor pages remain behind authentication.
+		 */
+		if (
+			location.hash === '#checkin' ||
+			validSessionFromUrl
+		) {
+			$('auth-gate')
+				.classList.add('hidden');
+
+			setView('checkin');
+		}
 	</script>
 </body>
 </html>
