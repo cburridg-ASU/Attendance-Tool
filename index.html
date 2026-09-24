@@ -1368,6 +1368,11 @@
 			</label>
 
 			<div class="roster-actions">
+				<button class="danger" type="button" id="clear-local-data">
+					<i data-lucide="trash-2" style="width:14px;vertical-align:-3px"></i>
+					Clear local data
+				</button>
+
 				<button class="secondary" type="button" id="cancel-roster">
 					Cancel
 				</button>
@@ -1459,8 +1464,6 @@
 		let sessionExpiresAt = null;
 		let sessionClientStartedAt = null;
 
-		// The classroom location is captured once when the instructor
-		// starts a session and then remains fixed for that session.
 		let classroomLocation = null;
 		let classroomLocationAccuracy = null;
 		let classroomLocationSource = null;
@@ -1879,9 +1882,56 @@
 			}
 		}
 
-		/* -----------------------------
-		   Location helpers
-		----------------------------- */
+		function makeQr() {
+			if (!sessionCode || !serverSession) {
+				const blank =
+					'd%3A%2F%2Fexample.invalid';
+
+				$('qr').src =
+					`https://api.qrserver.com/v1/create-qr-code/?size=390x390&margin=8&color=8c1d40&data=${blank}`;
+
+				$('presentation-qr').src =
+					$('qr').src;
+
+				updateSessionDetails();
+				return;
+			}
+
+			const baseUrl =
+				PUBLIC_BASE_URL ||
+				(
+					location.protocol === 'http:' ||
+					location.protocol === 'https:'
+				)
+					? location.origin + location.pathname
+					: location.href.split(/[?#]/)[0];
+
+			const params =
+				new URLSearchParams({
+					session:sessionCode,
+					class:$('class-name').value,
+					room:$('room-name').value,
+					radius:$('radius').value,
+					sessionStartedAt:
+						sessionStartedAt ||
+						sessionClientStartedAt ||
+						new Date().toISOString(),
+					lat:classroomLocation?.latitude ?? '',
+					lng:classroomLocation?.longitude ?? '',
+					instructorTimeZone
+				});
+
+			const url =
+				`${baseUrl}?${params.toString()}#checkin`;
+
+			const qrUrl =
+				`https://api.qrserver.com/v1/create-qr-code/?size=390x390&margin=8&color=8c1d40&data=${encodeURIComponent(url)}`;
+
+			$('qr').src = qrUrl;
+			$('presentation-qr').src = qrUrl;
+
+			updateSessionDetails();
+		}
 
 		function isValidCoordinates(latitude, longitude) {
 			return Number.isFinite(latitude) &&
@@ -1890,14 +1940,9 @@
 				longitude >= -180 && longitude <= 180;
 		}
 
-		/*
-		 * Ask the device for several fresh location readings and keep
-		 * the reading with the smallest reported accuracy radius.
-		 * This avoids relying on the first coarse reading a browser gives us.
-		 */
 		function getBestCurrentPosition({
-			timeout = 15000,
-			preferredAccuracy = 25
+			timeout = 20000,
+			minimumAccuracy = 35
 		} = {}) {
 			return new Promise((resolve, reject) => {
 				if (!('geolocation' in navigator)) {
@@ -1927,11 +1972,12 @@
 				};
 
 				const onPosition = position => {
+					const accuracy = Number(position.coords.accuracy);
 					const latitude = Number(position.coords.latitude);
 					const longitude = Number(position.coords.longitude);
-					const accuracy = Number(position.coords.accuracy);
 
-					if (!isValidCoordinates(latitude, longitude) || !Number.isFinite(accuracy)) {
+					if (!Number.isFinite(accuracy) ||
+						!isValidCoordinates(latitude, longitude)) {
 						return;
 					}
 
@@ -1939,7 +1985,7 @@
 						bestPosition = position;
 					}
 
-					if (accuracy <= preferredAccuracy) {
+					if (accuracy <= minimumAccuracy) {
 						finish(position);
 					}
 				};
@@ -1974,97 +2020,26 @@
 			});
 		}
 
-		function makeQr() {
-			if (!sessionCode || !serverSession || !classroomLocation) {
-				const blank =
-					'd%3A%2F%2Fexample.invalid';
-
-				$('qr').src =
-					`https://api.qrserver.com/v1/create-qr-code/?size=390x390&margin=8&color=8c1d40&data=${blank}`;
-
-				$('presentation-qr').src =
-					$('qr').src;
-
-				updateSessionDetails();
-				return;
-			}
-
-			const baseUrl =
-				PUBLIC_BASE_URL ||
-				(
-					location.protocol === 'http:' ||
-					location.protocol === 'https:'
-				)
-					? location.origin + location.pathname
-					: location.href.split(/[?#]/)[0];
-
-			const params =
-				new URLSearchParams({
-					session:sessionCode,
-					class:$('class-name').value,
-					room:$('room-name').value,
-					radius:$('radius').value,
-					sessionStartedAt:
-						sessionStartedAt ||
-						sessionClientStartedAt ||
-						new Date().toISOString(),
-					lat:classroomLocation.latitude,
-					lng:classroomLocation.longitude,
-					instructorTimeZone
-				});
-
-			const url =
-				`${baseUrl}?${params.toString()}#checkin`;
-
-			const qrUrl =
-				`https://api.qrserver.com/v1/create-qr-code/?size=390x390&margin=8&color=8c1d40&data=${encodeURIComponent(url)}`;
-
-			$('qr').src = qrUrl;
-			$('presentation-qr').src = qrUrl;
-
-			updateSessionDetails();
-		}
-
-		function distanceInMeters(
-			latitude,
-			longitude
-		) {
-			if (!classroomLocation || !isValidCoordinates(latitude, longitude)) {
+		function distanceInMeters(latitude, longitude) {
+			if (!classroomLocation ||
+				!isValidCoordinates(latitude, longitude)) {
 				return null;
 			}
 
 			const earthRadius = 6371000;
-
-			const toRadians =
-				value => value * Math.PI / 180;
-
-			const latitudeDelta =
-				toRadians(
-					latitude -
-					classroomLocation.latitude
-				);
-
-			const longitudeDelta =
-				toRadians(
-					longitude -
-					classroomLocation.longitude
-				);
+			const toRadians = value => value * Math.PI / 180;
+			const latitudeDelta = toRadians(latitude - classroomLocation.latitude);
+			const longitudeDelta = toRadians(longitude - classroomLocation.longitude);
 
 			const a =
 				Math.sin(latitudeDelta / 2) ** 2 +
-				Math.cos(
-					toRadians(classroomLocation.latitude)
-				) *
+				Math.cos(toRadians(classroomLocation.latitude)) *
 				Math.cos(toRadians(latitude)) *
 				Math.sin(longitudeDelta / 2) ** 2;
 
 			return Math.round(
-				earthRadius *
-				2 *
-				Math.atan2(
-					Math.sqrt(a),
-					Math.sqrt(1 - a)
-				)
+				earthRadius * 2 *
+				Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 			);
 		}
 
@@ -2268,50 +2243,63 @@
 			enrolledCount,
 			requireRosterMatch
 		}) {
-			const rosters =
-				readStorageArray(
-					STORAGE.rosters
-				);
+			const rosters = readStorageArray(STORAGE.rosters);
+			const cleanNames = names.map(name => name.trim()).filter(Boolean);
+			const cleanName = name.trim() || 'Unnamed roster';
+			const normalizedName = cleanName.toLowerCase();
 
-			const cleanNames =
-				names
-					.map(name => name.trim())
-					.filter(Boolean);
+			const existingIndex = rosters.findIndex(
+			rosterRecord =>
+				String(rosterRecord.name || '').trim().toLowerCase() === normalizedName
+			);
+
+			const existing = existingIndex >= 0 ? rosters[existingIndex] : null;
 
 			const rosterRecord = {
-				id:
-					crypto.randomUUID
+				id: existing?.id ||
+					(crypto.randomUUID
 						? crypto.randomUUID()
-						: `${Date.now()}-${Math.random()}`,
-				name:
-					name.trim() ||
-					'Unnamed roster',
+						: `${Date.now()}-${Math.random()}`),
+				name:cleanName,
 				names:cleanNames,
 				enrolledCount:Number(enrolledCount),
 				requireRosterMatch:!!requireRosterMatch,
 				savedAt:new Date().toISOString()
 			};
 
-			rosters.unshift(rosterRecord);
+			if (existingIndex >= 0) {
+				rosters[existingIndex] = rosterRecord;
+			} else {
+				rosters.unshift(rosterRecord);
+			}
 
-			/*
-			 * Keep a useful local history without allowing
-			 * the cache to grow forever.
-			 */
-			const limited =
-				rosters.slice(0,25);
-
-			writeStorage(
-				STORAGE.rosters,
-				limited
-			);
-
-			writeStorage(
-				STORAGE.activeRoster,
-				rosterRecord
-			);
+			writeStorage(STORAGE.rosters, rosters.slice(0,25));
+			writeStorage(STORAGE.activeRoster, rosterRecord);
 
 			return rosterRecord;
+		}
+
+		function clearLocalAttendanceData() {
+			const confirmed = confirm(
+				"This will remove all saved rosters, the active roster, saved attendance history, and this device's attendance token from this browser. Continue?"
+			);
+
+			if (!confirmed) return;
+
+			Object.values(STORAGE).forEach(key => localStorage.removeItem(key));
+
+			roster = [];
+			rosterConfigured = false;
+			enrolledCount = 0;
+			requireRosterMatch = false;
+
+			updateRosterDisplay();
+			if ($('saved-rosters-container')) {
+				$('saved-rosters-container').innerHTML = '';
+			}
+			if ($('history-list')) renderHistory();
+
+			toast('All local AttendanceRabbit data cleared');
 		}
 
 		function updateRosterDisplay() {
@@ -2705,15 +2693,14 @@
 				Number.isFinite(lat) &&
 				Number.isFinite(lng)
 			) {
-				classroomLocationAccuracy = Number(session.locationAccuracy);
-				if (!Number.isFinite(classroomLocationAccuracy)) classroomLocationAccuracy = null;
 				classroomLocation = {
 					latitude:lat,
 					longitude:lng
 				};
 
-				classroomLocationSource =
-					'session';
+				classroomLocationSource = 'session';
+				const sessionAccuracy = Number(session.locationAccuracy);
+				classroomLocationAccuracy = Number.isFinite(sessionAccuracy) ? sessionAccuracy : null;
 			}
 
 			if (session.className) {
@@ -2987,15 +2974,17 @@
 					};
 
 				/*
-				 * Capture the instructor's best fresh location BEFORE
-				 * creating the session. This coordinate becomes the
-				 * fixed classroom anchor for the entire QR session.
+				 * Capture the instructor location once, at the exact
+				 * moment the session/QR code is created. There is no
+				 * fallback coordinate. If the browser cannot provide
+				 * a location, the session is not created.
 				 */
-				getBestCurrentPosition({
-					timeout:15000,
-					preferredAccuracy:25
-				})
-				.then(position => {
+				try {
+					const position = await getBestCurrentPosition({
+						timeout:20000,
+						minimumAccuracy:35
+					});
+
 					const latitude = Number(position.coords.latitude);
 					const longitude = Number(position.coords.longitude);
 					const accuracy = Number(position.coords.accuracy);
@@ -3008,15 +2997,27 @@
 					classroomLocationAccuracy = accuracy;
 					classroomLocationSource = 'instructor';
 
-					return startServerSession();
-				})
-				.catch(error => {
+					await startServerSession();
+
+					if (accuracy > 50) {
+						toast(`New attendance session started · GPS accuracy ±${Math.round(accuracy)} m`);
+					}
+				} catch (error) {
 					button.disabled = false;
+					serverSession = false;
+					sessionActive = false;
+					sessionCode = '';
+					sessionStartedAt = null;
+					sessionExpiresAt = null;
 					classroomLocation = null;
 					classroomLocationAccuracy = null;
 					classroomLocationSource = null;
+					updateSessionStatus();
+					updateSessionControls();
+					updateSessionDetails();
+					setCountdownText(0);
 					toast(error.message);
-				});
+				}
 			}
 		);
 
@@ -3132,7 +3133,7 @@
 				lucide.createIcons();
 
 				const submitCheckin =
-					async (distance, latitude, longitude, accuracy) => {
+					async (distance, latitude, longitude, locationAccuracy) => {
 						try {
 							const clientTimestamp =
 								new Date()
@@ -3259,11 +3260,12 @@
 						}
 					};
 
-				getBestCurrentPosition({
-					timeout:15000,
-					preferredAccuracy:20
-				})
-				.then(position => {
+				try {
+					const position = await getBestCurrentPosition({
+						timeout:20000,
+						minimumAccuracy:25
+					});
+
 					const latitude = Number(position.coords.latitude);
 					const longitude = Number(position.coords.longitude);
 					const accuracy = Number(position.coords.accuracy);
@@ -3278,16 +3280,15 @@
 						throw new Error('The classroom location could not be verified. Please scan the current session QR code again.');
 					}
 
-					return submitCheckin(distance, latitude, longitude, accuracy);
-				})
-				.catch(error => {
+					await submitCheckin(distance, latitude, longitude, accuracy);
+				} catch (error) {
 					showCheckinWarning(error.message);
 					button.disabled = false;
-					button.innerHTML =
-						'<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in';
+					button.innerHTML = '<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in';
 					lucide.createIcons();
-				});
+				}
 			}
+
 		);
 
 		/* -----------------------------
@@ -3331,6 +3332,11 @@
 		$('cancel-roster').addEventListener(
 			'click',
 			closeRoster
+		);
+
+		$('clear-local-data').addEventListener(
+			'click',
+			clearLocalAttendanceData
 		);
 
 		$('roster-form').addEventListener(
