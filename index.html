@@ -519,6 +519,74 @@
 
 		.location-note i { flex:none;width:15px; }
 
+		.dev-log-trigger {
+			position:fixed;
+			left:16px;
+			bottom:16px;
+			z-index:60;
+			min-height:42px;
+			padding:0 14px;
+			color:white;
+			background:#263b35;
+			border:1px solid rgba(255,255,255,.28);
+			border-radius:8px;
+			box-shadow:0 5px 18px rgba(20,35,30,.22);
+			font:600 12px 'DM Sans',sans-serif;
+			cursor:pointer;
+		}
+
+		.dev-log-trigger i { width:15px;vertical-align:-3px;margin-right:5px; }
+
+		.dev-log-modal {
+			position:fixed;
+			inset:0;
+			z-index:70;
+			display:none;
+			place-items:center;
+			padding:20px;
+			background:rgba(24,48,43,.78);
+		}
+
+		.dev-log-modal.open { display:grid;animation:rise .2s ease both; }
+
+		.dev-log-card {
+			width:min(760px,100%);
+			max-height:min(780px,92vh);
+			overflow:auto;
+			padding:25px;
+			background:white;
+			border-radius:10px;
+			box-shadow:0 24px 80px rgba(0,0,0,.3);
+		}
+
+		.dev-log-head,
+		.dev-log-actions {
+			display:flex;
+			justify-content:space-between;
+			align-items:center;
+			gap:12px;
+		}
+
+		.dev-log-head { margin-bottom:18px; }
+		.dev-log-head h2 { margin:0;font-size:20px; }
+		.dev-log-head p { margin:5px 0 0;color:var(--muted);font-size:11px; }
+		.dev-log-form { display:grid;gap:12px; }
+		.dev-log-error { min-height:17px;color:#a13e32;font-size:12px; }
+		.dev-log-content {
+			max-height:48vh;
+			overflow:auto;
+			padding:14px;
+			color:#e7f0ec;
+			background:#1c2b27;
+			border-radius:6px;
+			font:11px/1.65 'DM Mono',monospace;
+			white-space:pre-wrap;
+			word-break:break-word;
+		}
+
+		.dev-log-actions { justify-content:flex-end;margin-top:12px; }
+		.dev-log-actions[hidden] { display:none; }
+
 		.checkin-form { padding:44px; }
 
 		.checkin-form h3 {
@@ -972,6 +1040,8 @@
 			.panel-head { padding:20px; }
 			.history-item { grid-template-columns:1fr; }
 			.history-actions { justify-content:flex-start; }
+			.dev-log-trigger { left:10px;bottom:10px; }
+			.dev-log-card { padding:19px; }
 		}
 	</style>
 </head>
@@ -1411,6 +1481,35 @@
 	</section>
 
 	<div class="toast" id="toast" role="status"></div>
+	<button class="dev-log-trigger" id="open-dev-log" type="button">
+		<i data-lucide="shield-alert"></i>Developer logs
+	</button>
+	<section class="dev-log-modal" id="dev-log-modal" aria-label="Private server diagnostics" aria-modal="true" role="dialog">
+		<div class="dev-log-card">
+			<div class="dev-log-head">
+				<div>
+					<h2>Server diagnostics</h2>
+					<p>Private server log. Student names and location coordinates are not recorded.</p>
+				</div>
+				<button class="close-icon" id="close-dev-log" type="button" aria-label="Close developer logs">
+					<i data-lucide="x" style="width:16px"></i>
+				</button>
+			</div>
+			<form class="dev-log-form" id="dev-log-form">
+				<div class="form-group">
+					<label class="field-label" for="dev-log-password">Developer password</label>
+					<input class="input" id="dev-log-password" type="password" autocomplete="off" required>
+				</div>
+				<button class="primary" type="submit"><i data-lucide="key-round" style="width:14px;vertical-align:-3px"></i>Open log</button>
+			</form>
+			<div class="dev-log-error" id="dev-log-error" role="alert"></div>
+			<pre class="dev-log-content" id="dev-log-content" hidden></pre>
+			<div class="dev-log-actions" id="dev-log-actions" hidden>
+				<button class="secondary" id="refresh-dev-log" type="button"><i data-lucide="refresh-cw" style="width:14px;vertical-align:-3px"></i>Refresh</button>
+				<button class="secondary" id="download-dev-log" type="button"><i data-lucide="download" style="width:14px;vertical-align:-3px"></i>Download</button>
+			</div>
+		</div>
+	</section>
 
 	<script>
 		/*
@@ -1933,6 +2032,25 @@
 			updateSessionDetails();
 		}
 
+		function reportDiagnostic(event, details = {}) {
+			const report = {
+				event,
+				message:details.message || '',
+				path:details.path || '',
+				sessionCode,
+				status:details.status,
+				browser:navigator.userAgent,
+				secureContext:window.isSecureContext,
+				geolocation:'geolocation' in navigator
+			};
+
+			void fetch(`${API_BASE_URL}/api/diagnostics`, {
+				method:'POST',
+				headers:{'Content-Type':'application/json'},
+				body:JSON.stringify(report)
+			}).catch(() => {});
+		}
+
 		function isValidCoordinates(latitude, longitude) {
 			return Number.isFinite(latitude) &&
 				Number.isFinite(longitude) &&
@@ -1946,6 +2064,9 @@
 		} = {}) {
 			return new Promise((resolve, reject) => {
 				if (!('geolocation' in navigator)) {
+					reportDiagnostic('location_unsupported', {
+						message:'Geolocation API is not available in this browser.'
+					});
 					reject(new Error('Location is not available on this device.'));
 					return;
 				}
@@ -1967,6 +2088,16 @@
 					if (position) {
 						resolve(position);
 					} else {
+						const locationCode = error?.locationCode;
+						const event = locationCode === 1
+							? 'location_permission_denied'
+							: locationCode === 2
+								? 'location_unavailable'
+								: 'location_timeout';
+						reportDiagnostic(event, {
+							message:error?.message || 'Location lookup failed.',
+							status:locationCode
+						});
 						reject(error || new Error('Unable to determine your location.'));
 					}
 				};
@@ -1992,12 +2123,14 @@
 
 				const onError = error => {
 					if (bestPosition) return;
-
-					if (error.code === 1) {
-						finish(null, new Error('Location permission was denied. Please allow location access for this site and try again.'));
-					} else if (error.code === 2) {
-						finish(null, new Error('Your device could not determine its location. Please try again.'));
-					}
+					const messages = {
+						1:'Location permission was denied.',
+						2:'The device could not determine its location.',
+						3:'The location request timed out.'
+					};
+					const locationError = new Error(messages[error.code] || 'Unable to determine location.');
+					locationError.locationCode = error.code;
+					finish(null, locationError);
 				};
 
 				const timer = setTimeout(() => {
@@ -2630,18 +2763,25 @@
 			path,
 			options = {}
 		) {
-			const response =
-				await fetch(
+			let response;
+			try {
+				response = await fetch(
 					`${API_BASE_URL}${path}`,
 					{
 						headers:{
-							'Content-Type':
-								'application/json',
+							'Content-Type':'application/json',
 							...(options.headers || {})
 						},
 						...options
 					}
 				);
+			} catch (error) {
+				reportDiagnostic('api_network_failure', {
+					path,
+					message:error.message
+				});
+				throw error;
+			}
 
 			const data =
 				await response
@@ -2649,6 +2789,11 @@
 					.catch(() => ({}));
 
 			if (!response.ok) {
+				reportDiagnostic('api_http_failure', {
+					path,
+					status:response.status,
+					message:data.error || response.statusText
+				});
 				throw new Error(
 					data.error ||
 					'The attendance service is unavailable.'
@@ -3415,6 +3560,72 @@
 		/* -----------------------------
 		   Attendance history
 		----------------------------- */
+
+		let devLogPassword = '';
+		let devLogRequestId = 0;
+
+		async function loadDeveloperLog() {
+			const requestId = ++devLogRequestId;
+			$('dev-log-error').textContent = '';
+			try {
+				const response = await fetch(`${API_BASE_URL}/api/dev/diagnostics`, {
+					headers:{'x-dev-password':devLogPassword}
+				});
+				const content = await response.text();
+				if (!response.ok) {
+					let message = 'Unable to load the server log.';
+					try { message = JSON.parse(content).error || message; } catch {}
+					throw new Error(message);
+				}
+				if (requestId !== devLogRequestId || !$('dev-log-modal').classList.contains('open')) return;
+				$('dev-log-content').textContent = content;
+				$('dev-log-content').hidden = false;
+				$('dev-log-actions').hidden = false;
+			} catch (error) {
+				if (requestId !== devLogRequestId || !$('dev-log-modal').classList.contains('open')) return;
+				$('dev-log-error').textContent = error.message;
+			}
+		}
+
+		function closeDeveloperLog() {
+			devLogRequestId += 1;
+			devLogPassword = '';
+			$('dev-log-password').value = '';
+			$('dev-log-content').textContent = '';
+			$('dev-log-content').hidden = true;
+			$('dev-log-actions').hidden = true;
+			$('dev-log-error').textContent = '';
+			$('dev-log-modal').classList.remove('open');
+		}
+
+		$('open-dev-log').addEventListener('click', () => {
+			$('dev-log-modal').classList.add('open');
+			$('dev-log-password').focus();
+		});
+
+		$('dev-log-form').addEventListener('submit', event => {
+			event.preventDefault();
+			devLogPassword = $('dev-log-password').value;
+			loadDeveloperLog();
+		});
+
+		$('refresh-dev-log').addEventListener('click', loadDeveloperLog);
+		$('close-dev-log').addEventListener('click', closeDeveloperLog);
+		$('dev-log-modal').addEventListener('click', event => {
+			if (event.target === $('dev-log-modal')) closeDeveloperLog();
+		});
+		$('download-dev-log').addEventListener('click', () => {
+			const file = new Blob([$('dev-log-content').textContent], { type:'text/plain' });
+			const url = URL.createObjectURL(file);
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = 'attendance-diagnostics.log';
+			link.click();
+			URL.revokeObjectURL(url);
+		});
+		document.addEventListener('keydown', event => {
+			if (event.key === 'Escape' && $('dev-log-modal').classList.contains('open')) closeDeveloperLog();
+		});
 
 		$('history').addEventListener(
 			'click',
