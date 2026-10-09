@@ -78,6 +78,9 @@ function sessionView(session) {
     className: session.className,
     room: session.room,
     radius: session.radius,
+    durationMinutes: session.durationMinutes || 15,
+    startedAt: session.startedAt,
+    expiresAt: session.expiresAt,
     active: session.active,
     checkins: session.checkins || []
   };
@@ -94,8 +97,10 @@ async function initializeDatabase() {
       roster JSONB NOT NULL DEFAULT '[]'::jsonb,
       require_roster_match BOOLEAN NOT NULL DEFAULT false,
       active BOOLEAN NOT NULL DEFAULT true,
+      duration_minutes INTEGER NOT NULL DEFAULT 15,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS duration_minutes INTEGER NOT NULL DEFAULT 15;
     CREATE TABLE IF NOT EXISTS attendance_checkins (
       id UUID PRIMARY KEY,
       session_code VARCHAR(6) NOT NULL REFERENCES attendance_sessions(code) ON DELETE CASCADE,
@@ -111,12 +116,22 @@ async function initializeDatabase() {
 }
 
 async function getSession(code) {
-  if (!pool) return memorySessions.get(code) || null;
+  if (!pool) {
+    const session = memorySessions.get(code);
+    if (!session) return null;
+    return {
+      ...session,
+      active: session.active && new Date(session.expiresAt).getTime() > Date.now()
+    };
+  }
   const result = await pool.query('SELECT * FROM attendance_sessions WHERE code = $1', [code]);
   if (!result.rows[0]) return null;
   const row = result.rows[0];
   const checkins = await pool.query('SELECT student_name AS name, submitted_at AS time, distance, status FROM attendance_checkins WHERE session_code = $1 ORDER BY submitted_at DESC', [code]);
-  return { code: row.code, className: row.class_name, room: row.room, radius: row.radius, roster: row.roster || [], requireRosterMatch: row.require_roster_match, active: row.active, checkins: checkins.rows.map(checkin => ({ ...checkin, time: new Date(checkin.time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), distance: `${checkin.distance} m` })) };
+  const startedAt = new Date(row.created_at);
+  const durationMinutes = Number(row.duration_minutes) || 15;
+  const expiresAt = new Date(startedAt.getTime() + durationMinutes * 60_000);
+  return { code: row.code, className: row.class_name, room: row.room, radius: row.radius, roster: row.roster || [], requireRosterMatch: row.require_roster_match, durationMinutes, startedAt: startedAt.toISOString(), expiresAt: expiresAt.toISOString(), active: row.active && expiresAt.getTime() > Date.now(), checkins: checkins.rows.map(checkin => ({ ...checkin, time: new Date(checkin.time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), distance: `${checkin.distance} m` })) };
 }
 
 app.get('/health', (req, res) => res.json({ ok: true }));
@@ -167,13 +182,17 @@ app.post('/api/sessions', withAsyncErrors(async (req, res) => {
   const className = cleanText(req.body.className, 120);
   const room = cleanText(req.body.room, 80);
   const radius = Number(req.body.radius);
+  const durationMinutes = Number(req.body.durationMinutes);
   const roster = Array.isArray(req.body.roster) ? req.body.roster.map(name => cleanText(name, 120)).filter(Boolean).slice(0, 500) : [];
   const requireRosterMatch = Boolean(req.body.requireRosterMatch);
   if (!className || !room || !Number.isFinite(radius) || radius < 1) return res.status(400).json({ error: 'Class, room, and radius are required.' });
+  if (!Number.isInteger(durationMinutes) || durationMinutes < 10 || durationMinutes > 120) return res.status(400).json({ error: 'Session duration must be between 10 minutes and 2 hours.' });
   let code;
   do { code = crypto.randomBytes(3).toString('hex').toUpperCase(); } while (pool ? false : memorySessions.has(code));
-  const session = { code, className, room, radius, roster, requireRosterMatch, active: true, checkins: [] };
-  if (pool) await pool.query('INSERT INTO attendance_sessions (code, class_name, room, radius, roster, require_roster_match) VALUES ($1, $2, $3, $4, $5, $6)', [code, className, room, radius, JSON.stringify(roster), requireRosterMatch]);
+  const startedAt = new Date();
+  const expiresAt = new Date(startedAt.getTime() + durationMinutes * 60_000);
+  const session = { code, className, room, radius, roster, requireRosterMatch, durationMinutes, startedAt: startedAt.toISOString(), expiresAt: expiresAt.toISOString(), active: true, checkins: [] };
+  if (pool) await pool.query('INSERT INTO attendance_sessions (code, class_name, room, radius, roster, require_roster_match, duration_minutes, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [code, className, room, radius, JSON.stringify(roster), requireRosterMatch, durationMinutes, startedAt]);
   else memorySessions.set(code, session);
   await recordAttendanceUse();
   res.status(201).json(sessionView(session));

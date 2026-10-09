@@ -1100,6 +1100,20 @@
 						</div>
 					</div>
 
+					<div class="form-group">
+						<label class="field-label" for="session-duration">Session duration</label>
+						<select id="session-duration">
+							<option value="10">10 minutes</option>
+							<option value="15" selected>15 minutes</option>
+							<option value="20">20 minutes</option>
+							<option value="30">30 minutes</option>
+							<option value="45">45 minutes</option>
+							<option value="60">1 hour</option>
+							<option value="90">1 hour 30 minutes</option>
+							<option value="120">2 hours</option>
+						</select>
+					</div>
+
 					<button class="primary full" id="start-session">
 						<i data-lucide="play" style="width:14px;vertical-align:-3px"></i>
 						Start attendance session
@@ -1112,7 +1126,7 @@
 						</div>
 						<div>
 							<span class="field-label">Duration</span>
-							<div class="session-value">15 minutes</div>
+							<div class="session-value" id="session-duration-label">15 minutes</div>
 						</div>
 					</div>
 				</article>
@@ -1527,7 +1541,7 @@
 		const API_BASE_URL = 'https://attendance-tool-mq9s.onrender.com';
 		const PUBLIC_BASE_URL = '';
 
-		const SESSION_DURATION_SECONDS = 15 * 60;
+		let SESSION_DURATION_SECONDS = 15 * 60;
 		const APP_TIME_ZONE = 'America/Phoenix';
 
 		const STORAGE = {
@@ -1854,7 +1868,7 @@
 
 			return new Date(
 				startDate.getTime() +
-				SESSION_DURATION_SECONDS * 1000
+				(Number(session.durationMinutes) || SESSION_DURATION_SECONDS / 60) * 60 * 1000
 			).toISOString();
 		}
 
@@ -1898,6 +1912,7 @@
 
 			$('present-qr').disabled = !active;
 			$('end-session').disabled = !active;
+			$('session-duration').disabled = active;
 
 			const micro =
 				document.querySelector(
@@ -2015,6 +2030,7 @@
 						sessionStartedAt ||
 						sessionClientStartedAt ||
 						new Date().toISOString(),
+					durationMinutes:String(SESSION_DURATION_SECONDS / 60),
 					lat:classroomLocation?.latitude ?? '',
 					lng:classroomLocation?.longitude ?? '',
 					instructorTimeZone
@@ -2805,6 +2821,14 @@
 
 		function applySession(session) {
 			serverSession = true;
+			const durationMinutes = Number(session.durationMinutes) || 15;
+			SESSION_DURATION_SECONDS = durationMinutes * 60;
+			$('session-duration').value = String(durationMinutes);
+			$('session-duration-label').textContent = durationMinutes < 60
+				? `${durationMinutes} minutes`
+				: durationMinutes === 60
+					? '1 hour'
+					: `${durationMinutes / 60} hours`;
 
 			sessionCode =
 				String(session.code || '')
@@ -2956,6 +2980,15 @@
 				);
 			});
 
+		$('session-duration').addEventListener('change', () => {
+			const durationMinutes = Number($('session-duration').value);
+			$('session-duration-label').textContent = durationMinutes < 60
+				? `${durationMinutes} minutes`
+				: durationMinutes === 60
+					? '1 hour'
+					: `${durationMinutes / 60} hours`;
+		});
+
 		/* -----------------------------
 		   Instructor authentication
 		----------------------------- */
@@ -3032,6 +3065,8 @@
 					$('start-session');
 
 				button.disabled = true;
+				SESSION_DURATION_SECONDS = Number($('session-duration').value) * 60;
+				const durationMinutes = SESSION_DURATION_SECONDS / 60;
 
 				sessionClientStartedAt =
 					new Date().toISOString();
@@ -3066,6 +3101,7 @@
 												$('room-name').value,
 											radius:
 												$('radius').value,
+										durationMinutes,
 											roster,
 											requireRosterMatch,
 											clientStartedAt:
@@ -3862,6 +3898,17 @@
 			) {
 				$('radius').value =
 					urlParams.get('radius');
+			}
+
+			const qrDurationMinutes = Number(urlParams.get('durationMinutes'));
+			if (Number.isInteger(qrDurationMinutes) && qrDurationMinutes >= 10 && qrDurationMinutes <= 120) {
+				SESSION_DURATION_SECONDS = qrDurationMinutes * 60;
+				$('session-duration').value = String(qrDurationMinutes);
+				$('session-duration-label').textContent = qrDurationMinutes < 60
+					? `${qrDurationMinutes} minutes`
+					: qrDurationMinutes === 60
+						? '1 hour'
+						: `${qrDurationMinutes / 60} hours`;
 			}
 
 			const qrTimeZone =
