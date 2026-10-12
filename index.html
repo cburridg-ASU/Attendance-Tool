@@ -598,6 +598,32 @@
 		.dev-log-head p { margin:5px 0 0;color:var(--muted);font-size:11px; }
 		.dev-log-form { display:grid;gap:12px; }
 		.dev-log-error { min-height:17px;color:#a13e32;font-size:12px; }
+		.dev-log-device-list {
+			display:grid;
+			gap:8px;
+			max-height:190px;
+			overflow:auto;
+			margin:12px 0;
+		}
+		.dev-log-device {
+			display:flex;
+			justify-content:space-between;
+			align-items:center;
+			gap:12px;
+			width:100%;
+			padding:10px 12px;
+			text-align:left;
+			color:var(--ink);
+			background:#f7f4f2;
+			border:1px solid var(--line);
+			border-radius:6px;
+			cursor:pointer;
+		}
+		.dev-log-device:hover,.dev-log-device.selected { border-color:var(--wine);background:#fbf5f7; }
+		.dev-log-device strong,.dev-log-device small { display:block; }
+		.dev-log-device small { margin-top:3px;color:var(--muted);font-size:11px; }
+		.dev-log-device-count { flex:none;color:var(--muted);font:11px 'DM Mono',monospace; }
+		.dev-log-device-empty { padding:10px 0;color:var(--muted);font-size:12px; }
 		.dev-log-content {
 			max-height:48vh;
 			overflow:auto;
@@ -1247,6 +1273,7 @@
 								<th>Time</th>
 								<th>Distance</th>
 								<th>Status</th>
+								<th>Flag</th>
 							</tr>
 						</thead>
 						<tbody id="attendance-body"></tbody>
@@ -1270,12 +1297,12 @@
 
 						<p>
 							Confirm your name and we'll use your location to verify this check-in.
-							Your location is only used for this attendance submission.
+							If your location can't be accessed, your check-in can still be recorded as flagged.
 						</p>
 
 						<div class="location-note">
 							<i data-lucide="map-pin"></i>
-							<span>Location permission is requested only when you press Check in.</span>
+							<span>Location permission is requested only when you press Check in. If unavailable, the attendance record will show an unknown location and a device login error flag.</span>
 						</div>
 					</div>
 
@@ -1542,11 +1569,15 @@
 				</div>
 				<button class="primary" type="submit"><i data-lucide="key-round" style="width:14px;vertical-align:-3px"></i>Open log</button>
 			</form>
-			<div class="form-group">
-				<label class="field-label" for="dev-log-device-id">Device ID (optional)</label>
-				<input class="input" id="dev-log-device-id" inputmode="text" maxlength="16" pattern="[a-fA-F0-9]{16}" autocomplete="off" placeholder="16-character ID from the server log">
+			<div id="dev-log-device-section" hidden>
+				<div class="dev-log-head" style="margin:12px 0 4px">
+					<strong>Saved device traces</strong>
+					<button class="secondary" id="refresh-devices" type="button">Refresh devices</button>
+				</div>
+				<p style="margin:0;color:var(--muted);font-size:11px">Select a device to inspect its server-saved connection and check-in events.</p>
+				<div class="dev-log-device-list" id="dev-log-device-list" aria-label="Saved device traces"></div>
+				<div class="micro" id="dev-log-selected-label">Showing server diagnostics</div>
 			</div>
-			<p style="margin:-9px 0 12px;color:var(--muted);font-size:11px">Leave blank for the server log. Device IDs appear as deviceId=... in its entries.</p>
 			<div class="dev-log-error" id="dev-log-error" role="alert"></div>
 			<pre class="dev-log-content" id="dev-log-content" hidden></pre>
 			<div class="dev-log-actions" id="dev-log-actions" hidden>
@@ -1783,6 +1814,7 @@
 								${escapeHtml(record.status || 'Unknown')}
 							</span>
 						</td>
+						<td>${record.deviceLoginError ? 'Device login error' : '—'}</td>
 					</tr>
 				`)
 				.join('');
@@ -2178,7 +2210,9 @@
 					reportDiagnostic('location_unsupported', {
 						message:'Geolocation API is not available in this browser.'
 					});
-					reject(new Error('Location is not available on this device.'));
+					const error = new Error('Location is not available on this device.');
+					error.locationAccessFailure = true;
+					reject(error);
 					return;
 				}
 
@@ -2250,6 +2284,7 @@
 					};
 					const locationError = new Error(messages[error.code] || 'Unable to determine location.');
 					locationError.locationCode = error.code;
+					locationError.locationAccessFailure = true;
 					finish(null, locationError);
 				};
 
@@ -2257,19 +2292,27 @@
 					if (bestPosition) {
 						finish(bestPosition);
 					} else {
-						finish(null, new Error('Location lookup timed out. Please try again.'));
+						const error = new Error('Location lookup timed out.');
+						error.locationAccessFailure = true;
+						finish(null, error);
 					}
 				}, timeout);
 
-				watchId = navigator.geolocation.watchPosition(
-					onPosition,
-					onError,
-					{
-						enableHighAccuracy:true,
-						timeout,
-						maximumAge:0
-					}
-				);
+				try {
+					watchId = navigator.geolocation.watchPosition(
+						onPosition,
+						onError,
+						{
+							enableHighAccuracy:true,
+							timeout,
+							maximumAge:0
+						}
+					);
+				} catch (error) {
+					const locationError = new Error(error.message || 'Location access failed.');
+					locationError.locationAccessFailure = true;
+					finish(null, locationError);
+				}
 			});
 		}
 
@@ -3468,7 +3511,7 @@
 				reportDiagnostic('checkin_location_requested');
 
 				const submitCheckin =
-					async (distance, latitude, longitude, locationAccuracy) => {
+					async (distance, deviceLoginError = false) => {
 						try {
 							reportDiagnostic('checkin_submission_started', {
 								action:'POST /api/sessions/:code/checkins'
@@ -3485,6 +3528,7 @@
 										body:JSON.stringify({
 											name,
 											distance,
+											deviceLoginError,
 											deviceToken:
 												deviceToken(),
 											clientTimestamp,
@@ -3574,11 +3618,15 @@
 
 							$('result-distance')
 								.textContent =
-								`${checkin.distance} from classroom`;
+								checkin.deviceLoginError
+									? 'Unknown · location unavailable'
+									: `${checkin.distance} from classroom`;
 
 							$('result-state')
 								.textContent =
-								checkin.status ===
+								checkin.deviceLoginError
+									? 'ATTENDANCE FLAGGED · DEVICE LOGIN ERROR'
+									: checkin.status ===
 								'Present'
 									? 'ATTENDANCE RECORDED'
 									: 'ATTENDANCE FLAGGED';
@@ -3606,10 +3654,23 @@
 					};
 
 				try {
-					const position = await getBestCurrentPosition({
-						timeout:20000,
-						minimumAccuracy:25
-					});
+					let position;
+					try {
+						position = await getBestCurrentPosition({
+							timeout:20000,
+							minimumAccuracy:25
+						});
+					} catch (error) {
+						if (!error.locationAccessFailure) {
+							throw error;
+						}
+
+						reportDiagnostic('checkin_location_unavailable_submitting_flagged', {
+							message:error.message
+						});
+						await submitCheckin(null, true);
+						return;
+					}
 
 					const latitude = Number(position.coords.latitude);
 					const longitude = Number(position.coords.longitude);
@@ -3625,7 +3686,7 @@
 						throw new Error('The classroom location could not be verified. Please scan the current session QR code again.');
 					}
 
-					await submitCheckin(distance, latitude, longitude, accuracy);
+					await submitCheckin(distance);
 				} catch (error) {
 					reportDiagnostic('checkin_location_or_validation_failed', {
 						message:error.message
@@ -3766,15 +3827,12 @@
 
 		let devLogPassword = '';
 		let devLogRequestId = 0;
+		let selectedDevLogDeviceId = '';
+		let selectedDevLogFileName = 'attendance-diagnostics.log';
 
-		async function loadDeveloperLog() {
+		async function loadDeveloperLog(deviceId = selectedDevLogDeviceId) {
 			const requestId = ++devLogRequestId;
 			$('dev-log-error').textContent = '';
-			const deviceId = $('dev-log-device-id').value.trim();
-			if (deviceId && !/^[a-f0-9]{16}$/i.test(deviceId)) {
-				$('dev-log-error').textContent = 'Enter a 16-character device ID from the server log.';
-				return;
-			}
 			try {
 				const query = deviceId ? `?device=${encodeURIComponent(deviceId)}` : '';
 				const response = await fetch(`${API_BASE_URL}/api/dev/diagnostics${query}`, {
@@ -3790,20 +3848,83 @@
 				$('dev-log-content').textContent = content;
 				$('dev-log-content').hidden = false;
 				$('dev-log-actions').hidden = false;
+				selectedDevLogDeviceId = deviceId || '';
+				selectedDevLogFileName = deviceId
+					? `attendance-device-${deviceId}-diagnostics.log`
+					: 'attendance-diagnostics.log';
+				$('dev-log-selected-label').textContent = deviceId
+					? `Showing device ${deviceId}`
+					: 'Showing server diagnostics';
+				$('dev-log-device-list').querySelectorAll('.dev-log-device').forEach(button => {
+					button.classList.toggle('selected', button.dataset.deviceId === selectedDevLogDeviceId);
+				});
 			} catch (error) {
 				if (requestId !== devLogRequestId || !$('dev-log-modal').classList.contains('open')) return;
 				$('dev-log-error').textContent = error.message;
 			}
 		}
 
+		async function loadDeveloperDevices() {
+			$('dev-log-error').textContent = '';
+			try {
+				const response = await fetch(`${API_BASE_URL}/api/dev/devices`, {
+					headers:{'x-dev-password':devLogPassword}
+				});
+				const content = await response.text();
+				if (!response.ok) {
+					let message = 'Unable to load saved device traces.';
+					try { message = JSON.parse(content).error || message; } catch {}
+					throw new Error(message);
+				}
+
+				const devices = JSON.parse(content);
+				$('dev-log-device-section').hidden = false;
+				$('dev-log-device-list').innerHTML = devices.length
+					? devices.map((device, index) => {
+						const details = [
+							device.sessionCode ? `Session ${device.sessionCode}` : '',
+							device.className || '',
+							device.room || ''
+						].filter(Boolean).join(' · ') || 'Session details unavailable';
+						const lastSeen = device.lastSeen
+							? new Date(device.lastSeen).toLocaleString()
+							: 'Unknown last activity';
+						return `
+							<button class="dev-log-device${device.deviceId === selectedDevLogDeviceId ? ' selected' : ''}" type="button" data-device-id="${escapeHtml(device.deviceId)}">
+								<span>
+									<strong>Device ${index + 1} · ${escapeHtml(details)}</strong>
+									<small>${escapeHtml(lastSeen)} · ID ${escapeHtml(device.deviceId)}</small>
+								</span>
+								<span class="dev-log-device-count">${Number(device.entries) || 0} events</span>
+							</button>
+						`;
+					}).join('')
+					: '<div class="dev-log-device-empty">No device traces have been saved yet.</div>';
+			} catch (error) {
+				$('dev-log-device-list').innerHTML = '';
+				$('dev-log-error').textContent = error.message;
+			}
+		}
+
+		async function refreshDeveloperDiagnostics() {
+			await Promise.all([
+				loadDeveloperLog(),
+				loadDeveloperDevices()
+			]);
+		}
+
 		function closeDeveloperLog() {
 			devLogRequestId += 1;
 			devLogPassword = '';
 			$('dev-log-password').value = '';
-			$('dev-log-device-id').value = '';
+			selectedDevLogDeviceId = '';
+			selectedDevLogFileName = 'attendance-diagnostics.log';
 			$('dev-log-content').textContent = '';
 			$('dev-log-content').hidden = true;
 			$('dev-log-actions').hidden = true;
+			$('dev-log-device-section').hidden = true;
+			$('dev-log-device-list').innerHTML = '';
+			$('dev-log-selected-label').textContent = 'Showing server diagnostics';
 			$('dev-log-error').textContent = '';
 			$('dev-log-modal').classList.remove('open');
 		}
@@ -3816,10 +3937,18 @@
 		$('dev-log-form').addEventListener('submit', event => {
 			event.preventDefault();
 			devLogPassword = $('dev-log-password').value;
-			loadDeveloperLog();
+			selectedDevLogDeviceId = '';
+			loadDeveloperLog('');
+			loadDeveloperDevices();
 		});
 
-		$('refresh-dev-log').addEventListener('click', loadDeveloperLog);
+		$('refresh-dev-log').addEventListener('click', refreshDeveloperDiagnostics);
+		$('refresh-devices').addEventListener('click', loadDeveloperDevices);
+		$('dev-log-device-list').addEventListener('click', event => {
+			const button = event.target.closest('[data-device-id]');
+			if (!button) return;
+			loadDeveloperLog(button.dataset.deviceId);
+		});
 		$('close-dev-log').addEventListener('click', closeDeveloperLog);
 		$('dev-log-modal').addEventListener('click', event => {
 			if (event.target === $('dev-log-modal')) closeDeveloperLog();
@@ -3829,10 +3958,7 @@
 			const url = URL.createObjectURL(file);
 			const link = document.createElement('a');
 			link.href = url;
-			const deviceId = $('dev-log-device-id').value.trim();
-			link.download = deviceId
-				? `attendance-device-${deviceId}-diagnostics.log`
-				: 'attendance-diagnostics.log';
+			link.download = selectedDevLogFileName;
 			link.click();
 			URL.revokeObjectURL(url);
 		});
@@ -3952,14 +4078,16 @@
 					'Student',
 					'Time',
 					'Distance',
-					'Status'
+					'Status',
+					'Flag'
 				],
 				...recordsToExport.map(
 					record => [
 						record.name,
 						formatRecordTime(record),
 						record.distance,
-						record.status
+						record.status,
+						record.deviceLoginError ? 'Device login error' : ''
 					]
 				)
 			];

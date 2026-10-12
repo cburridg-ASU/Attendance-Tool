@@ -68,6 +68,23 @@ function deviceFingerprint(deviceToken) {
 function recordAttendanceUse() {
   return enqueueDiagnostics(async () => {
     await fs.mkdir(path.dirname(diagnosticsPath), { recursive: true });
+    if (pool) {
+      const result = await pool.query(
+        'UPDATE attendance_diagnostics_usage SET uses = uses + 1 WHERE id = 1 RETURNING uses'
+      );
+      attendanceUses = Number(result.rows[0]?.uses) || 0;
+      if (attendanceUses >= 15) {
+        attendanceUses = 0;
+        await pool.query('UPDATE attendance_diagnostics_usage SET uses = 0 WHERE id = 1');
+        await pool.query('DELETE FROM device_diagnostics');
+        await fs.writeFile(diagnosticsPath, '', 'utf8');
+        await fs.rm(deviceDiagnosticsPath, { recursive: true, force: true });
+        const timestamp = new Date().toISOString();
+        await fs.appendFile(diagnosticsPath, `${timestamp} | INFO | Log reset after 15 attendance sessions\n`, 'utf8');
+      }
+      return;
+    }
+
     attendanceUses += 1;
     if (attendanceUses >= 15) {
       attendanceUses = 0;
@@ -86,6 +103,25 @@ function passwordMatches(candidate) {
   const expected = Buffer.from(devPassword);
   const supplied = Buffer.from(candidate);
   return expected.length === supplied.length && crypto.timingSafeEqual(expected, supplied);
+}
+
+function authorizeDeveloperLog(req, res) {
+  const address = req.ip || req.socket.remoteAddress || 'unknown';
+  const failures = failedDevLogAttempts.get(address) || { count: 0, blockedUntil: 0 };
+  if (Date.now() < failures.blockedUntil) {
+    res.status(429).json({ error: 'Too many attempts. Try again later.' });
+    return false;
+  }
+  const candidate = cleanText(req.get('x-dev-password'), 200);
+  if (!passwordMatches(candidate)) {
+    failures.count += 1;
+    if (failures.count >= 5) failures.blockedUntil = Date.now() + 5 * 60 * 1000;
+    failedDevLogAttempts.set(address, failures);
+    res.status(401).json({ error: 'Developer password is incorrect.' });
+    return false;
+  }
+  failedDevLogAttempts.delete(address);
+  return true;
 }
 
 function sessionView(session) {
@@ -124,10 +160,32 @@ async function initializeDatabase() {
       submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       distance INTEGER NOT NULL,
       status TEXT NOT NULL,
+      device_login_error BOOLEAN NOT NULL DEFAULT false,
       device_token TEXT NOT NULL,
       UNIQUE (session_code, student_name),
       UNIQUE (session_code, device_token)
     );
+    ALTER TABLE attendance_checkins ALTER COLUMN distance DROP NOT NULL;
+    ALTER TABLE attendance_checkins ADD COLUMN IF NOT EXISTS device_login_error BOOLEAN NOT NULL DEFAULT false;
+    CREATE TABLE IF NOT EXISTS device_diagnostics (
+      id BIGSERIAL PRIMARY KEY,
+      device_id VARCHAR(16) NOT NULL,
+      event TEXT NOT NULL,
+      session_code VARCHAR(6),
+      class_name TEXT,
+      room TEXT,
+      role TEXT,
+      details JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS device_diagnostics_device_created_idx
+      ON device_diagnostics (device_id, created_at DESC);
+    CREATE TABLE IF NOT EXISTS attendance_diagnostics_usage (
+      id SMALLINT PRIMARY KEY CHECK (id = 1),
+      uses INTEGER NOT NULL DEFAULT 0
+    );
+    INSERT INTO attendance_diagnostics_usage (id, uses) VALUES (1, 0)
+      ON CONFLICT (id) DO NOTHING;
   `);
 }
 
@@ -143,11 +201,11 @@ async function getSession(code) {
   const result = await pool.query('SELECT * FROM attendance_sessions WHERE code = $1', [code]);
   if (!result.rows[0]) return null;
   const row = result.rows[0];
-  const checkins = await pool.query('SELECT student_name AS name, submitted_at AS time, distance, status FROM attendance_checkins WHERE session_code = $1 ORDER BY submitted_at DESC', [code]);
+  const checkins = await pool.query("SELECT student_name AS name, submitted_at AS time, CASE WHEN distance IS NULL THEN 'Unknown' ELSE distance::text || ' m' END AS distance, status, device_login_error AS \"deviceLoginError\" FROM attendance_checkins WHERE session_code = $1 ORDER BY submitted_at DESC", [code]);
   const startedAt = new Date(row.created_at);
   const durationMinutes = Number(row.duration_minutes) || 15;
   const expiresAt = new Date(startedAt.getTime() + durationMinutes * 60_000);
-  return { code: row.code, className: row.class_name, room: row.room, radius: row.radius, roster: row.roster || [], requireRosterMatch: row.require_roster_match, durationMinutes, startedAt: startedAt.toISOString(), expiresAt: expiresAt.toISOString(), active: row.active && expiresAt.getTime() > Date.now(), checkins: checkins.rows.map(checkin => ({ ...checkin, time: new Date(checkin.time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), distance: `${checkin.distance} m` })) };
+  return { code: row.code, className: row.class_name, room: row.room, radius: row.radius, roster: row.roster || [], requireRosterMatch: row.require_roster_match, durationMinutes, startedAt: startedAt.toISOString(), expiresAt: expiresAt.toISOString(), active: row.active && expiresAt.getTime() > Date.now(), checkins: checkins.rows.map(checkin => ({ ...checkin, time: new Date(checkin.time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) })) };
 }
 
 app.get('/health', (req, res) => res.json({ ok: true }));
@@ -229,33 +287,116 @@ app.post('/api/device-diagnostics', withAsyncErrors(async (req, res) => {
       ? Math.min(req.body.requiredAccuracy, 100_000)
       : undefined
   };
+  if (pool) {
+    await pool.query(
+      'INSERT INTO device_diagnostics (device_id, event, session_code, class_name, room, role, details) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [
+        details.deviceId,
+        event,
+        details.session || null,
+        details.class || null,
+        details.room || null,
+        details.role || null,
+        JSON.stringify(details)
+      ]
+    );
+  }
   await appendDiagnostic('DEVICE', event, details);
   res.status(202).json({ ok: true, deviceId: details.deviceId });
 }));
 
 app.get('/api/dev/diagnostics', withAsyncErrors(async (req, res) => {
-  const address = req.ip || req.socket.remoteAddress || 'unknown';
-  const failures = failedDevLogAttempts.get(address) || { count: 0, blockedUntil: 0 };
-  if (Date.now() < failures.blockedUntil) return res.status(429).json({ error: 'Too many attempts. Try again later.' });
-  const candidate = cleanText(req.get('x-dev-password'), 200);
-  if (!passwordMatches(candidate)) {
-    failures.count += 1;
-    if (failures.count >= 5) failures.blockedUntil = Date.now() + 5 * 60 * 1000;
-    failedDevLogAttempts.set(address, failures);
-    return res.status(401).json({ error: 'Developer password is incorrect.' });
-  }
-  failedDevLogAttempts.delete(address);
+  if (!authorizeDeveloperLog(req, res)) return;
   let content = '';
   const deviceId = cleanText(req.query.device, 16);
   if (deviceId && !/^[a-f0-9]{16}$/i.test(deviceId)) {
     return res.status(400).json({ error: 'Device ID must be a 16-character hexadecimal value.' });
   }
-  const logPath = deviceId
-    ? path.join(deviceDiagnosticsPath, `${deviceId.toLowerCase()}.log`)
-    : diagnosticsPath;
-  try { content = await fs.readFile(logPath, 'utf8'); }
-  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  if (deviceId && pool) {
+    const result = await pool.query(
+      'SELECT event, details, created_at FROM device_diagnostics WHERE device_id = $1 ORDER BY created_at, id',
+      [deviceId.toLowerCase()]
+    );
+    content = result.rows.map(row => {
+      const details = row.details || {};
+      const detailText = Object.entries(details)
+        .filter(([, value]) => value !== undefined && value !== '')
+        .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
+        .join(' ');
+      return `${new Date(row.created_at).toISOString()} | DEVICE | ${row.event}${detailText ? ` | ${detailText}` : ''}`;
+    }).join('\n');
+  } else {
+    const logPath = deviceId
+      ? path.join(deviceDiagnosticsPath, `${deviceId.toLowerCase()}.log`)
+      : diagnosticsPath;
+    try { content = await fs.readFile(logPath, 'utf8'); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
   res.type('text/plain').send(content || (deviceId ? 'No diagnostics have been recorded for this device.' : 'No diagnostics have been recorded.'));
+}));
+
+app.get('/api/dev/devices', withAsyncErrors(async (req, res) => {
+  if (!authorizeDeveloperLog(req, res)) return;
+  if (pool) {
+    const result = await pool.query(`
+      SELECT device_id AS "deviceId",
+        COUNT(*)::INTEGER AS entries,
+        MAX(created_at) AS "lastSeen",
+        (ARRAY_AGG(session_code ORDER BY created_at DESC) FILTER (WHERE session_code IS NOT NULL))[1] AS "sessionCode",
+        (ARRAY_AGG(class_name ORDER BY created_at DESC) FILTER (WHERE class_name IS NOT NULL))[1] AS "className",
+        (ARRAY_AGG(room ORDER BY created_at DESC) FILTER (WHERE room IS NOT NULL))[1] AS room
+      FROM device_diagnostics
+      GROUP BY device_id
+      ORDER BY MAX(created_at) DESC
+      LIMIT 200
+    `);
+    const devices = new Map(result.rows.map(device => [device.deviceId, device]));
+    let files = [];
+    try { files = await fs.readdir(deviceDiagnosticsPath, { withFileTypes: true }); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    for (const file of files) {
+      if (!file.isFile() || !/^[a-f0-9]{16}\.log$/i.test(file.name)) continue;
+      const deviceId = file.name.slice(0, 16).toLowerCase();
+      if (devices.has(deviceId)) continue;
+      const stats = await fs.stat(path.join(deviceDiagnosticsPath, file.name));
+      const content = await fs.readFile(path.join(deviceDiagnosticsPath, file.name), 'utf8');
+      devices.set(deviceId, {
+        deviceId,
+        entries:content.split(/\r?\n/).filter(Boolean).length,
+        lastSeen:stats.mtime.toISOString(),
+        sessionCode:'',
+        className:'',
+        room:''
+      });
+    }
+    return res.json([...devices.values()]
+      .sort((left, right) => new Date(right.lastSeen).getTime() - new Date(left.lastSeen).getTime())
+      .slice(0, 200));
+  }
+
+  let files = [];
+  try { files = await fs.readdir(deviceDiagnosticsPath, { withFileTypes: true }); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  const devices = await Promise.all(files
+    .filter(file => file.isFile() && /^[a-f0-9]{16}\.log$/i.test(file.name))
+    .map(async file => {
+      const deviceId = file.name.slice(0, 16).toLowerCase();
+      const filePath = path.join(deviceDiagnosticsPath, file.name);
+      const [content, stats] = await Promise.all([
+        fs.readFile(filePath, 'utf8'),
+        fs.stat(filePath)
+      ]);
+      return {
+        deviceId,
+        entries:content.split(/\r?\n/).filter(Boolean).length,
+        lastSeen:stats.mtime.toISOString(),
+        sessionCode:'',
+        className:'',
+        room:''
+      };
+    }));
+  devices.sort((left, right) => right.lastSeen.localeCompare(left.lastSeen));
+  res.json(devices.slice(0, 200));
 }));
 
 app.post('/api/sessions', withAsyncErrors(async (req, res) => {
@@ -297,10 +438,15 @@ app.post('/api/sessions/:code/checkins', withAsyncErrors(async (req, res) => {
   }
   const studentName = cleanText(req.body.name, 120);
   const deviceToken = cleanText(req.body.deviceToken, 120);
-  const distance = Math.max(0, Math.round(Number(req.body.distance) || 0));
-  if (!studentName || !deviceToken) {
+  const deviceLoginError = req.body.deviceLoginError === true;
+  const distance = deviceLoginError
+    ? null
+    : typeof req.body.distance === 'number' && Number.isFinite(req.body.distance)
+      ? Math.max(0, Math.round(req.body.distance))
+      : null;
+  if (!studentName || !deviceToken || (!deviceLoginError && distance === null)) {
     await appendDiagnostic('WARN', 'checkin_missing_fields', { session: code });
-    return res.status(400).json({ error: 'Student name and device token are required.' });
+    return res.status(400).json({ error: 'Student name, device token, and a valid location distance are required.' });
   }
   if (session.requireRosterMatch && !session.roster.some(name => name.toLowerCase() === studentName.toLowerCase())) {
     await appendDiagnostic('WARN', 'checkin_roster_mismatch', { session: code });
@@ -314,12 +460,28 @@ app.post('/api/sessions/:code/checkins', withAsyncErrors(async (req, res) => {
     await appendDiagnostic('WARN', 'checkin_duplicate_device', { session: code });
     return res.status(409).json({ error: 'This device has already submitted attendance for this session.' });
   }
-  const status = distance <= session.radius ? 'Present' : 'Flagged';
+  if (deviceLoginError) {
+    await appendDiagnostic('WARN', 'checkin_location_unavailable', {
+      session: code,
+      deviceId: deviceFingerprint(deviceToken)
+    });
+  }
+  const status = deviceLoginError || distance > session.radius ? 'Flagged' : 'Present';
   const submittedAt = new Date();
-  const checkin = { name: studentName, time: submittedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), distance: `${distance} m`, status, deviceToken };
+  const checkin = {
+    name: studentName,
+    time: submittedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+    distance: distance === null ? 'Unknown' : `${distance} m`,
+    status,
+    deviceLoginError,
+    deviceToken
+  };
   if (pool) {
     try {
-      await pool.query('INSERT INTO attendance_checkins (id, session_code, student_name, distance, status, device_token) VALUES ($1, $2, $3, $4, $5, $6)', [crypto.randomUUID(), code, studentName, distance, status, deviceToken]);
+      await pool.query(
+        'INSERT INTO attendance_checkins (id, session_code, student_name, distance, status, device_login_error, device_token) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [crypto.randomUUID(), code, studentName, distance, status, deviceLoginError, deviceToken]
+      );
     } catch (error) {
       if (error.code === '23505') {
         await appendDiagnostic('WARN', 'checkin_duplicate_database_constraint', { session: code });
@@ -350,10 +512,12 @@ app.use((error, req, res, next) => {
 });
 
 initializeDatabase().then(async () => {
-  try {
-    const usage = JSON.parse(await fs.readFile(diagnosticsUsagePath, 'utf8'));
-    attendanceUses = Number.isInteger(usage.uses) ? Math.min(14, Math.max(0, usage.uses)) : 0;
-  } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  if (!pool) {
+    try {
+      const usage = JSON.parse(await fs.readFile(diagnosticsUsagePath, 'utf8'));
+      attendanceUses = Number.isInteger(usage.uses) ? Math.min(14, Math.max(0, usage.uses)) : 0;
+    } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
   app.listen(port, () => console.log(`Attendance API listening on ${port}`));
 }).catch(async error => {
   console.error(error);
