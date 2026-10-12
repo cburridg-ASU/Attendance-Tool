@@ -12,6 +12,7 @@ const frontendOrigin = process.env.FRONTEND_ORIGIN || '*';
 const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }) : null;
 const memorySessions = new Map();
 const diagnosticsPath = path.join(process.cwd(), 'server-logs', 'attendance-diagnostics.log');
+const deviceDiagnosticsPath = path.join(process.cwd(), 'server-logs', 'device-diagnostics');
 const diagnosticsUsagePath = path.join(process.cwd(), 'server-logs', 'attendance-uses.json');
 const devPassword = process.env.DEV_LOG_PASSWORD || 'DevDimeLab';
 const failedDevLogAttempts = new Map();
@@ -26,6 +27,10 @@ app.use(express.static(process.cwd(), { index: 'index.html' }));
 
 function cleanText(value, maxLength) {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
+}
+
+function cleanLogText(value, maxLength) {
+  return cleanText(value, maxLength).replace(/[\r\n\u0000-\u001f\u007f]/g, ' ');
 }
 
 function withAsyncErrors(handler) {
@@ -46,8 +51,18 @@ function appendDiagnostic(level, event, details = {}) {
       .filter(([, value]) => value !== undefined && value !== '')
       .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
       .join(' ');
-    await fs.appendFile(diagnosticsPath, `${timestamp} | ${level} | ${event}${detailText ? ` | ${detailText}` : ''}\n`, 'utf8');
+    const line = `${timestamp} | ${level} | ${event}${detailText ? ` | ${detailText}` : ''}\n`;
+    await fs.appendFile(diagnosticsPath, line, 'utf8');
+    if (details.deviceId) {
+      const devicePath = path.join(deviceDiagnosticsPath, `${details.deviceId}.log`);
+      await fs.mkdir(deviceDiagnosticsPath, { recursive: true });
+      await fs.appendFile(devicePath, line, 'utf8');
+    }
   }).catch(error => console.error('Diagnostics write failed:', error.message));
+}
+
+function deviceFingerprint(deviceToken) {
+  return crypto.createHash('sha256').update(deviceToken).digest('hex').slice(0, 16);
 }
 
 function recordAttendanceUse() {
@@ -57,6 +72,7 @@ function recordAttendanceUse() {
     if (attendanceUses >= 15) {
       attendanceUses = 0;
       await fs.writeFile(diagnosticsPath, '', 'utf8');
+      await fs.rm(deviceDiagnosticsPath, { recursive: true, force: true });
       await fs.writeFile(diagnosticsUsagePath, JSON.stringify({ uses: 0 }), 'utf8');
       const timestamp = new Date().toISOString();
       await fs.appendFile(diagnosticsPath, `${timestamp} | INFO | Log reset after 15 attendance sessions\n`, 'utf8');
@@ -160,6 +176,63 @@ app.post('/api/diagnostics', withAsyncErrors(async (req, res) => {
   res.status(202).json({ ok: true });
 }));
 
+app.post('/api/device-diagnostics', withAsyncErrors(async (req, res) => {
+  const address = req.ip || req.socket.remoteAddress || 'unknown';
+  const attempts = diagnosticReportAttempts.get(address) || { count: 0, startedAt: Date.now() };
+  if (Date.now() - attempts.startedAt >= 60_000) {
+    attempts.count = 0;
+    attempts.startedAt = Date.now();
+  }
+  attempts.count += 1;
+  diagnosticReportAttempts.set(address, attempts);
+  if (attempts.count > 600) return res.status(429).json({ error: 'Diagnostic reporting limit reached.' });
+
+  const event = cleanText(req.body.event, 80).replace(/[^a-zA-Z0-9_.-]/g, '_');
+  const deviceToken = cleanText(req.body.deviceToken, 120);
+  if (!event) return res.status(400).json({ error: 'A diagnostic event is required.' });
+  if (!/^[a-zA-Z0-9._-]{1,120}$/.test(deviceToken)) {
+    return res.status(400).json({ error: 'A valid device token is required.' });
+  }
+
+  const session = req.body.sessionContext && typeof req.body.sessionContext === 'object'
+    ? req.body.sessionContext
+    : {};
+  const details = {
+    deviceId: deviceFingerprint(deviceToken),
+    role: cleanLogText(session.role, 20),
+    session: cleanLogText(session.code, 6).toUpperCase(),
+    class: cleanLogText(session.className, 120),
+    room: cleanLogText(session.room, 80),
+    sessionStartedAt: cleanLogText(session.startedAt, 40),
+    sessionExpiresAt: cleanLogText(session.expiresAt, 40),
+    sessionActive: typeof session.active === 'boolean' ? session.active : undefined,
+    action: cleanLogText(req.body.action, 80),
+    field: cleanLogText(req.body.field, 80),
+    inputType: cleanLogText(req.body.inputType, 30),
+    valueLength: Number.isInteger(req.body.valueLength) && req.body.valueLength >= 0
+      ? Math.min(req.body.valueLength, 10_000)
+      : undefined,
+    hasValue: typeof req.body.hasValue === 'boolean' ? req.body.hasValue : undefined,
+    checked: typeof req.body.checked === 'boolean' ? req.body.checked : undefined,
+    valid: typeof req.body.valid === 'boolean' ? req.body.valid : undefined,
+    path: cleanLogText(req.body.path, 120),
+    status: Number.isInteger(req.body.status) ? req.body.status : undefined,
+    message: cleanLogText(req.body.message, 240),
+    browser: cleanLogText(req.body.browser, 180),
+    secureContext: typeof req.body.secureContext === 'boolean' ? req.body.secureContext : undefined,
+    geolocation: typeof req.body.geolocation === 'boolean' ? req.body.geolocation : undefined,
+    locationAvailable: typeof req.body.locationAvailable === 'boolean' ? req.body.locationAvailable : undefined,
+    locationAccuracy: Number.isFinite(req.body.locationAccuracy) && req.body.locationAccuracy >= 0
+      ? Math.min(req.body.locationAccuracy, 100_000)
+      : undefined,
+    requiredAccuracy: Number.isFinite(req.body.requiredAccuracy) && req.body.requiredAccuracy >= 0
+      ? Math.min(req.body.requiredAccuracy, 100_000)
+      : undefined
+  };
+  await appendDiagnostic('DEVICE', event, details);
+  res.status(202).json({ ok: true, deviceId: details.deviceId });
+}));
+
 app.get('/api/dev/diagnostics', withAsyncErrors(async (req, res) => {
   const address = req.ip || req.socket.remoteAddress || 'unknown';
   const failures = failedDevLogAttempts.get(address) || { count: 0, blockedUntil: 0 };
@@ -173,9 +246,16 @@ app.get('/api/dev/diagnostics', withAsyncErrors(async (req, res) => {
   }
   failedDevLogAttempts.delete(address);
   let content = '';
-  try { content = await fs.readFile(diagnosticsPath, 'utf8'); }
+  const deviceId = cleanText(req.query.device, 16);
+  if (deviceId && !/^[a-f0-9]{16}$/i.test(deviceId)) {
+    return res.status(400).json({ error: 'Device ID must be a 16-character hexadecimal value.' });
+  }
+  const logPath = deviceId
+    ? path.join(deviceDiagnosticsPath, `${deviceId.toLowerCase()}.log`)
+    : diagnosticsPath;
+  try { content = await fs.readFile(logPath, 'utf8'); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
-  res.type('text/plain').send(content || 'No diagnostics have been recorded.');
+  res.type('text/plain').send(content || (deviceId ? 'No diagnostics have been recorded for this device.' : 'No diagnostics have been recorded.'));
 }));
 
 app.post('/api/sessions', withAsyncErrors(async (req, res) => {

@@ -537,6 +537,32 @@
 
 		.dev-log-trigger i { width:15px;vertical-align:-3px;margin-right:5px; }
 
+		.student-checkin-page .dev-log-trigger {
+			min-width:34px;
+			min-height:34px;
+			width:34px;
+			height:34px;
+			padding:0;
+			opacity:.72;
+		}
+
+		.student-checkin-page .dev-log-trigger i {
+			width:14px;
+			margin:0;
+		}
+
+		.student-checkin-page .dev-log-trigger span {
+			position:absolute;
+			width:1px;
+			height:1px;
+			padding:0;
+			margin:-1px;
+			overflow:hidden;
+			clip:rect(0,0,0,0);
+			white-space:nowrap;
+			border:0;
+		}
+
 		.dev-log-modal {
 			position:fixed;
 			inset:0;
@@ -1495,15 +1521,15 @@
 	</section>
 
 	<div class="toast" id="toast" role="status"></div>
-	<button class="dev-log-trigger" id="open-dev-log" type="button">
-		<i data-lucide="shield-alert"></i>Developer logs
+	<button class="dev-log-trigger" id="open-dev-log" type="button" aria-label="Open developer logs" title="Developer logs">
+		<i data-lucide="shield-alert"></i><span>Developer logs</span>
 	</button>
-	<section class="dev-log-modal" id="dev-log-modal" aria-label="Private server diagnostics" aria-modal="true" role="dialog">
+	<section class="dev-log-modal" id="dev-log-modal" aria-label="Private diagnostics" aria-modal="true" role="dialog">
 		<div class="dev-log-card">
 			<div class="dev-log-head">
 				<div>
-					<h2>Server diagnostics</h2>
-					<p>Private server log. Student names and location coordinates are not recorded.</p>
+					<h2>Developer diagnostics</h2>
+					<p>Server and per-device logs. Student names and location coordinates are not recorded.</p>
 				</div>
 				<button class="close-icon" id="close-dev-log" type="button" aria-label="Close developer logs">
 					<i data-lucide="x" style="width:16px"></i>
@@ -1516,6 +1542,11 @@
 				</div>
 				<button class="primary" type="submit"><i data-lucide="key-round" style="width:14px;vertical-align:-3px"></i>Open log</button>
 			</form>
+			<div class="form-group">
+				<label class="field-label" for="dev-log-device-id">Device ID (optional)</label>
+				<input class="input" id="dev-log-device-id" inputmode="text" maxlength="16" pattern="[a-fA-F0-9]{16}" autocomplete="off" placeholder="16-character ID from the server log">
+			</div>
+			<p style="margin:-9px 0 12px;color:var(--muted);font-size:11px">Leave blank for the server log. Device IDs appear as deviceId=... in its entries.</p>
 			<div class="dev-log-error" id="dev-log-error" role="alert"></div>
 			<pre class="dev-log-content" id="dev-log-content" hidden></pre>
 			<div class="dev-log-actions" id="dev-log-actions" hidden>
@@ -1558,6 +1589,9 @@
 			/^[A-Z0-9]{6}$/i.test(sessionFromUrl);
 
 		const isStudentCheckinPage = !!validSessionFromUrl;
+		if (isStudentCheckinPage) {
+			document.body.classList.add('student-checkin-page');
+		}
 
 		const records = [];
 
@@ -1586,6 +1620,7 @@
 
 		let serverPollingInterval = null;
 		let countdownInterval = null;
+		let sessionConnectionDiagnosticState = 'not-started';
 
 		const $ = id => document.getElementById(id);
 
@@ -2049,23 +2084,83 @@
 		}
 
 		function reportDiagnostic(event, details = {}) {
+			let diagnosticDeviceToken;
+			try {
+				diagnosticDeviceToken = deviceToken();
+			} catch (error) {
+				console.warn('Unable to identify this device for diagnostics:', error.message);
+				return;
+			}
+
 			const report = {
 				event,
 				message:details.message || '',
 				path:details.path || '',
-				sessionCode,
+				deviceToken:diagnosticDeviceToken,
+				sessionContext:{
+					role:isStudentCheckinPage ? 'student' : 'instructor',
+					code:sessionCode || '',
+					className:$('class-name')?.value || urlParams.get('class') || '',
+					room:$('room-name')?.value || urlParams.get('room') || '',
+					startedAt:sessionStartedAt || urlParams.get('sessionStartedAt') || '',
+					expiresAt:sessionExpiresAt || '',
+					active:sessionActive,
+					locationAvailable:!!classroomLocation
+				},
+				action:details.action || event,
+				field:details.field,
+				inputType:details.inputType,
+				valueLength:details.valueLength,
+				hasValue:details.hasValue,
+				checked:details.checked,
+				valid:details.valid,
 				status:details.status,
 				browser:navigator.userAgent,
 				secureContext:window.isSecureContext,
-				geolocation:'geolocation' in navigator
+				geolocation:'geolocation' in navigator,
+				locationAvailable:!!classroomLocation
 			};
 
-			void fetch(`${API_BASE_URL}/api/diagnostics`, {
+			void fetch(`${API_BASE_URL}/api/device-diagnostics`, {
 				method:'POST',
 				headers:{'Content-Type':'application/json'},
 				body:JSON.stringify(report)
-			}).catch(() => {});
+			}).then(response => {
+				if (!response.ok) {
+					console.warn(`Unable to save device diagnostic (${response.status}).`);
+				}
+			}).catch(error => {
+				console.warn('Unable to send device diagnostic:', error.message);
+			});
 		}
+
+		const diagnosticInputTimers = new WeakMap();
+
+		document.addEventListener('input', event => {
+			const field = event.target;
+			if (!(field instanceof HTMLInputElement ||
+				field instanceof HTMLTextAreaElement ||
+				field instanceof HTMLSelectElement) ||
+				field.type === 'password') {
+				return;
+			}
+
+			clearTimeout(diagnosticInputTimers.get(field));
+			diagnosticInputTimers.set(field, setTimeout(() => {
+				reportDiagnostic('input_read', {
+					field:field.id || field.name || 'unnamed',
+					inputType:field.type || field.tagName.toLowerCase(),
+					valueLength:field.value.length,
+					hasValue:field.value.trim().length > 0,
+					valid:field.checkValidity(),
+					checked:
+						field instanceof HTMLInputElement &&
+						(field.type === 'checkbox' || field.type === 'radio')
+							? field.checked
+							: undefined
+				});
+			}, 700));
+		});
 
 		function isValidCoordinates(latitude, longitude) {
 			return Number.isFinite(latitude) &&
@@ -2090,6 +2185,7 @@
 				let bestPosition = null;
 				let watchId = null;
 				let finished = false;
+				let invalidPositionReported = false;
 
 				const finish = (position, error = null) => {
 					if (finished) return;
@@ -2102,6 +2198,10 @@
 					clearTimeout(timer);
 
 					if (position) {
+						reportDiagnostic('location_lookup_succeeded', {
+							locationAccuracy:Number(position.coords.accuracy),
+							requiredAccuracy:minimumAccuracy
+						});
 						resolve(position);
 					} else {
 						const locationCode = error?.locationCode;
@@ -2125,6 +2225,10 @@
 
 					if (!Number.isFinite(accuracy) ||
 						!isValidCoordinates(latitude, longitude)) {
+						if (!invalidPositionReported) {
+							invalidPositionReported = true;
+							reportDiagnostic('location_fix_rejected_invalid');
+						}
 						return;
 					}
 
@@ -2933,7 +3037,26 @@
 					);
 
 				applySession(session);
+				if (
+					isStudentCheckinPage &&
+					sessionConnectionDiagnosticState !== 'connected'
+				) {
+					sessionConnectionDiagnosticState = 'connected';
+					reportDiagnostic('session_connect_succeeded', {
+						path:`/api/sessions/${encodeURIComponent(sessionCode)}`
+					});
+				}
 			} catch (error) {
+				if (
+					isStudentCheckinPage &&
+					sessionConnectionDiagnosticState === 'connecting'
+				) {
+					sessionConnectionDiagnosticState = 'failed';
+					reportDiagnostic('session_connect_failed', {
+						path:`/api/sessions/${encodeURIComponent(sessionCode)}`,
+						message:error.message
+					});
+				}
 				if (
 					location.hash === '#checkin'
 				) {
@@ -2949,6 +3072,16 @@
 				clearInterval(
 					serverPollingInterval
 				);
+			}
+
+			if (
+				isStudentCheckinPage &&
+				sessionConnectionDiagnosticState === 'not-started'
+			) {
+				sessionConnectionDiagnosticState = 'connecting';
+				reportDiagnostic('session_connect_attempted', {
+					path:`/api/sessions/${encodeURIComponent(sessionCode)}`
+				});
 			}
 
 			refreshServerSession();
@@ -3280,9 +3413,27 @@
 						.value
 						.trim();
 
-				if (!name) return;
+				reportDiagnostic('checkin_submit_attempted', {
+					field:'student-name',
+					inputType:'text',
+					valueLength:name.length,
+					hasValue:!!name,
+					valid:$('student-name').checkValidity()
+				});
+
+				if (!name) {
+					reportDiagnostic('checkin_blocked_empty_name', {
+						field:'student-name',
+						inputType:'text',
+						valueLength:0,
+						hasValue:false,
+						valid:$('student-name').checkValidity()
+					});
+					return;
+				}
 
 				if (!serverSession) {
+					reportDiagnostic('checkin_blocked_session_connecting');
 					showCheckinWarning(
 						'Connecting to the attendance session. Please try again in a moment.'
 					);
@@ -3291,6 +3442,7 @@
 				}
 
 				if (!sessionActive) {
+					reportDiagnostic('checkin_blocked_inactive_session');
 					showCheckinWarning(
 						'This attendance session is no longer active.'
 					);
@@ -3313,9 +3465,14 @@
 
 				lucide.createIcons();
 
+				reportDiagnostic('checkin_location_requested');
+
 				const submitCheckin =
 					async (distance, latitude, longitude, locationAccuracy) => {
 						try {
+							reportDiagnostic('checkin_submission_started', {
+								action:'POST /api/sessions/:code/checkins'
+							});
 							const clientTimestamp =
 								new Date()
 									.toISOString();
@@ -3340,6 +3497,10 @@
 										})
 									}
 								);
+
+							reportDiagnostic('checkin_submission_succeeded', {
+								status:201
+							});
 
 							checkin.clientTimestamp =
 								checkin.clientTimestamp ||
@@ -3427,6 +3588,9 @@
 
 							lucide.createIcons();
 						} catch (error) {
+							reportDiagnostic('checkin_submission_failed', {
+								message:error.message
+							});
 							showCheckinWarning(
 								error.message
 							);
@@ -3463,6 +3627,9 @@
 
 					await submitCheckin(distance, latitude, longitude, accuracy);
 				} catch (error) {
+					reportDiagnostic('checkin_location_or_validation_failed', {
+						message:error.message
+					});
 					showCheckinWarning(error.message);
 					button.disabled = false;
 					button.innerHTML = '<i data-lucide="check-circle" style="width:15px;vertical-align:-3px"></i> Check in';
@@ -3603,8 +3770,14 @@
 		async function loadDeveloperLog() {
 			const requestId = ++devLogRequestId;
 			$('dev-log-error').textContent = '';
+			const deviceId = $('dev-log-device-id').value.trim();
+			if (deviceId && !/^[a-f0-9]{16}$/i.test(deviceId)) {
+				$('dev-log-error').textContent = 'Enter a 16-character device ID from the server log.';
+				return;
+			}
 			try {
-				const response = await fetch(`${API_BASE_URL}/api/dev/diagnostics`, {
+				const query = deviceId ? `?device=${encodeURIComponent(deviceId)}` : '';
+				const response = await fetch(`${API_BASE_URL}/api/dev/diagnostics${query}`, {
 					headers:{'x-dev-password':devLogPassword}
 				});
 				const content = await response.text();
@@ -3627,6 +3800,7 @@
 			devLogRequestId += 1;
 			devLogPassword = '';
 			$('dev-log-password').value = '';
+			$('dev-log-device-id').value = '';
 			$('dev-log-content').textContent = '';
 			$('dev-log-content').hidden = true;
 			$('dev-log-actions').hidden = true;
@@ -3655,7 +3829,10 @@
 			const url = URL.createObjectURL(file);
 			const link = document.createElement('a');
 			link.href = url;
-			link.download = 'attendance-diagnostics.log';
+			const deviceId = $('dev-log-device-id').value.trim();
+			link.download = deviceId
+				? `attendance-device-${deviceId}-diagnostics.log`
+				: 'attendance-diagnostics.log';
 			link.click();
 			URL.revokeObjectURL(url);
 		});
