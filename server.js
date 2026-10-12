@@ -33,6 +33,13 @@ function cleanLogText(value, maxLength) {
   return cleanText(value, maxLength).replace(/[\r\n\u0000-\u001f\u007f]/g, ' ');
 }
 
+function extractLatestDiagnosticStudentName(content) {
+  const matches = [...content.matchAll(/(?:^|\s)studentName=("(?:\\.|[^"\\])*")/g)];
+  if (!matches.length) return '';
+  try { return JSON.parse(matches[matches.length - 1][1]); }
+  catch { return ''; }
+}
+
 function withAsyncErrors(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 }
@@ -149,10 +156,12 @@ async function initializeDatabase() {
       roster JSONB NOT NULL DEFAULT '[]'::jsonb,
       require_roster_match BOOLEAN NOT NULL DEFAULT false,
       active BOOLEAN NOT NULL DEFAULT true,
+      activated BOOLEAN NOT NULL DEFAULT true,
       duration_minutes INTEGER NOT NULL DEFAULT 15,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS duration_minutes INTEGER NOT NULL DEFAULT 15;
+    ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS activated BOOLEAN NOT NULL DEFAULT true;
     CREATE TABLE IF NOT EXISTS attendance_checkins (
       id UUID PRIMARY KEY,
       session_code VARCHAR(6) NOT NULL REFERENCES attendance_sessions(code) ON DELETE CASCADE,
@@ -257,6 +266,7 @@ app.post('/api/device-diagnostics', withAsyncErrors(async (req, res) => {
     : {};
   const details = {
     deviceId: deviceFingerprint(deviceToken),
+    studentName: cleanLogText(req.body.studentName, 120) || undefined,
     role: cleanLogText(session.role, 20),
     session: cleanLogText(session.code, 6).toUpperCase(),
     class: cleanLogText(session.className, 120),
@@ -279,7 +289,14 @@ app.post('/api/device-diagnostics', withAsyncErrors(async (req, res) => {
     browser: cleanLogText(req.body.browser, 180),
     secureContext: typeof req.body.secureContext === 'boolean' ? req.body.secureContext : undefined,
     geolocation: typeof req.body.geolocation === 'boolean' ? req.body.geolocation : undefined,
-    locationAvailable: typeof req.body.locationAvailable === 'boolean' ? req.body.locationAvailable : undefined,
+    classroomLocationAvailable: typeof req.body.classroomLocationAvailable === 'boolean' ? req.body.classroomLocationAvailable : undefined,
+    permissionState: cleanLogText(req.body.permissionState, 20),
+    errorName: cleanLogText(req.body.errorName, 80),
+    errorCode: Number.isInteger(req.body.errorCode) ? req.body.errorCode : undefined,
+    nativeMessage: cleanLogText(req.body.nativeMessage, 240),
+    visibilityState: cleanLogText(req.body.visibilityState, 20),
+    userActivation: typeof req.body.userActivation === 'boolean' ? req.body.userActivation : undefined,
+    permissionsApi: typeof req.body.permissionsApi === 'boolean' ? req.body.permissionsApi : undefined,
     locationAccuracy: Number.isFinite(req.body.locationAccuracy) && req.body.locationAccuracy >= 0
       ? Math.min(req.body.locationAccuracy, 100_000)
       : undefined,
@@ -344,7 +361,8 @@ app.get('/api/dev/devices', withAsyncErrors(async (req, res) => {
         MAX(created_at) AS "lastSeen",
         (ARRAY_AGG(session_code ORDER BY created_at DESC) FILTER (WHERE session_code IS NOT NULL))[1] AS "sessionCode",
         (ARRAY_AGG(class_name ORDER BY created_at DESC) FILTER (WHERE class_name IS NOT NULL))[1] AS "className",
-        (ARRAY_AGG(room ORDER BY created_at DESC) FILTER (WHERE room IS NOT NULL))[1] AS room
+            (ARRAY_AGG(room ORDER BY created_at DESC) FILTER (WHERE room IS NOT NULL))[1] AS room,
+            (ARRAY_AGG(details->>'studentName' ORDER BY created_at DESC) FILTER (WHERE details ? 'studentName'))[1] AS "studentName"
       FROM device_diagnostics
       GROUP BY device_id
       ORDER BY MAX(created_at) DESC
@@ -366,7 +384,8 @@ app.get('/api/dev/devices', withAsyncErrors(async (req, res) => {
         lastSeen:stats.mtime.toISOString(),
         sessionCode:'',
         className:'',
-        room:''
+        room:'',
+        studentName:extractLatestDiagnosticStudentName(content)
       });
     }
     return res.json([...devices.values()]
@@ -392,7 +411,8 @@ app.get('/api/dev/devices', withAsyncErrors(async (req, res) => {
         lastSeen:stats.mtime.toISOString(),
         sessionCode:'',
         className:'',
-        room:''
+        room:'',
+        studentName:extractLatestDiagnosticStudentName(content)
       };
     }));
   devices.sort((left, right) => right.lastSeen.localeCompare(left.lastSeen));
@@ -412,11 +432,37 @@ app.post('/api/sessions', withAsyncErrors(async (req, res) => {
   do { code = crypto.randomBytes(3).toString('hex').toUpperCase(); } while (pool ? false : memorySessions.has(code));
   const startedAt = new Date();
   const expiresAt = new Date(startedAt.getTime() + durationMinutes * 60_000);
-  const session = { code, className, room, radius, roster, requireRosterMatch, durationMinutes, startedAt: startedAt.toISOString(), expiresAt: expiresAt.toISOString(), active: true, checkins: [] };
-  if (pool) await pool.query('INSERT INTO attendance_sessions (code, class_name, room, radius, roster, require_roster_match, duration_minutes, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [code, className, room, radius, JSON.stringify(roster), requireRosterMatch, durationMinutes, startedAt]);
+  const session = { code, className, room, radius, roster, requireRosterMatch, durationMinutes, startedAt: startedAt.toISOString(), expiresAt: expiresAt.toISOString(), active: false, activated: false, checkins: [] };
+  if (pool) await pool.query('INSERT INTO attendance_sessions (code, class_name, room, radius, roster, require_roster_match, duration_minutes, created_at, active, activated) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, false)', [code, className, room, radius, JSON.stringify(roster), requireRosterMatch, durationMinutes, startedAt]);
   else memorySessions.set(code, session);
   await recordAttendanceUse();
   res.status(201).json(sessionView(session));
+}));
+
+app.post('/api/sessions/:code/activate', withAsyncErrors(async (req, res) => {
+  const code = cleanText(req.params.code, 6).toUpperCase();
+  const session = await getSession(code);
+  if (!session) return res.status(404).json({ error: 'Session not found.' });
+
+  if (pool) {
+    await pool.query(
+      'UPDATE attendance_sessions SET active = true, activated = true, created_at = NOW() WHERE code = $1 AND activated = false',
+      [code]
+    );
+  } else {
+    const storedSession = memorySessions.get(code);
+    if (storedSession && !storedSession.activated) {
+      storedSession.startedAt = new Date().toISOString();
+      storedSession.expiresAt = new Date(
+        new Date(storedSession.startedAt).getTime() + storedSession.durationMinutes * 60_000
+      ).toISOString();
+      storedSession.active = true;
+      storedSession.activated = true;
+    }
+  }
+
+  const activatedSession = await getSession(code);
+  res.json(sessionView(activatedSession));
 }));
 
 app.get('/api/sessions/:code', withAsyncErrors(async (req, res) => {

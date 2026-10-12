@@ -315,6 +315,21 @@
 			padding:26px 0 15px;
 		}
 
+		.qr-placeholder {
+			display:grid;
+			place-items:center;
+			width:190px;
+			height:190px;
+			padding:20px;
+			color:var(--muted);
+			background:#f7f4f2;
+			border:1px dashed var(--line);
+			border-radius:13px;
+			text-align:center;
+			font-size:12px;
+			line-height:1.5;
+		}
+
 		#qr {
 			display:block;
 			width:190px;
@@ -323,6 +338,8 @@
 			background:white;
 			border-radius:13px;
 		}
+
+		#qr[hidden],.presentation-qr[hidden] { display:none; }
 
 		.code {
 			text-align:center;
@@ -1193,13 +1210,14 @@
 					</div>
 
 					<div class="qr-stage">
-						<img id="qr" width="190" height="190" aria-label="Session QR code">
+						<img id="qr" width="190" height="190" aria-label="Session QR code" hidden>
+						<div class="qr-placeholder" id="qr-placeholder">The official session QR code will appear here after setup.</div>
 						<div class="code" id="session-code">------</div>
 
 						<div class="expires">
 							<i data-lucide="timer" style="width:13px"></i>
 							Expires in
-							<strong id="countdown">15:00</strong>
+							<strong id="countdown">00:00</strong>
 						</div>
 					</div>
 
@@ -1311,7 +1329,7 @@
 
 						<p class="panel-sub">
 							Session <strong id="checkin-session-code">------</strong>
-							· closes in <strong id="student-countdown">15:00</strong>
+							· closes in <strong id="student-countdown">00:00</strong>
 						</p>
 
 						<form id="checkin-form">
@@ -1378,6 +1396,7 @@
 					class="presentation-qr"
 					id="presentation-qr"
 					alt="Scan this QR code to check in"
+					hidden
 				>
 
 				<div class="presentation-code" id="presentation-code">------</div>
@@ -1385,7 +1404,7 @@
 				<div class="presentation-expiry">
 					<i data-lucide="timer" style="width:15px"></i>
 					Session closes in
-					<strong id="presentation-countdown">15:00</strong>
+					<strong id="presentation-countdown">00:00</strong>
 				</div>
 
 				<div class="presentation-hint">
@@ -1556,7 +1575,7 @@
 			<div class="dev-log-head">
 				<div>
 					<h2>Developer diagnostics</h2>
-					<p>Server and per-device logs. Student names and location coordinates are not recorded.</p>
+					<p>Per-device logs include the entered student name after check-in is attempted. Location coordinates are not recorded.</p>
 				</div>
 				<button class="close-icon" id="close-dev-log" type="button" aria-label="Close developer logs">
 					<i data-lucide="x" style="width:16px"></i>
@@ -1625,6 +1644,7 @@
 		}
 
 		const records = [];
+		let diagnosticStudentName = '';
 
 		let roster = [];
 		let rosterConfigured = false;
@@ -1867,6 +1887,7 @@
 				sessionActive = false;
 				updateSessionControls();
 				updateSessionStatus();
+				makeQr();
 
 				if (serverPollingInterval) {
 					refreshServerSession();
@@ -2064,39 +2085,42 @@
 		}
 
 		function makeQr() {
-			if (!sessionCode || !serverSession) {
-				const blank =
-					'd%3A%2F%2Fexample.invalid';
-
-				$('qr').src =
-					`https://api.qrserver.com/v1/create-qr-code/?size=390x390&margin=8&color=8c1d40&data=${blank}`;
-
-				$('presentation-qr').src =
-					$('qr').src;
-
+			if (!sessionCode || !serverSession || !sessionActive) {
+				$('qr').hidden = true;
+				$('presentation-qr').hidden = true;
+				$('qr').removeAttribute('src');
+				$('presentation-qr').removeAttribute('src');
+				$('qr-placeholder').hidden = false;
+				$('qr-placeholder').textContent = 'The official session QR code will appear here after setup.';
 				updateSessionDetails();
 				return;
 			}
 
+			const qrUrl = sessionQrUrl(sessionCode);
+			if ($('qr').src !== qrUrl) $('qr').src = qrUrl;
+			if ($('presentation-qr').src !== qrUrl) $('presentation-qr').src = qrUrl;
+			$('qr').hidden = false;
+			$('presentation-qr').hidden = false;
+			$('qr-placeholder').hidden = true;
+			updateSessionDetails();
+		}
+
+		function sessionQrUrl(code) {
 			const baseUrl =
 				PUBLIC_BASE_URL ||
-				(
+				((
 					location.protocol === 'http:' ||
 					location.protocol === 'https:'
 				)
 					? location.origin + location.pathname
-					: location.href.split(/[?#]/)[0];
+					: location.href.split(/[?#]/)[0]);
 
 			const params =
 				new URLSearchParams({
-					session:sessionCode,
+					session:code,
 					class:$('class-name').value,
 					room:$('room-name').value,
 					radius:$('radius').value,
-					sessionStartedAt:
-						sessionStartedAt ||
-						sessionClientStartedAt ||
-						new Date().toISOString(),
 					durationMinutes:String(SESSION_DURATION_SECONDS / 60),
 					lat:classroomLocation?.latitude ?? '',
 					lng:classroomLocation?.longitude ?? '',
@@ -2109,10 +2133,31 @@
 			const qrUrl =
 				`https://api.qrserver.com/v1/create-qr-code/?size=390x390&margin=8&color=8c1d40&data=${encodeURIComponent(url)}`;
 
-			$('qr').src = qrUrl;
-			$('presentation-qr').src = qrUrl;
+			return qrUrl;
+		}
 
-			updateSessionDetails();
+		function preloadOfficialQr(code) {
+			$('qr-placeholder').textContent = 'Loading official session QR code…';
+			const image = new Image();
+			return new Promise((resolve, reject) => {
+				let settled = false;
+				const finish = error => {
+					if (settled) return;
+					settled = true;
+					clearTimeout(timeout);
+					if (error) reject(error);
+					else resolve();
+				};
+				const timeout = setTimeout(() => {
+					finish(new Error('The official QR code took too long to load. Please try starting the session again.'));
+				}, 20000);
+				image.onload = () => finish();
+				image.onerror = () => finish(new Error('The official QR code could not be loaded. Check your connection and try again.'));
+				image.src = sessionQrUrl(code);
+				if (image.complete && image.naturalWidth > 0) {
+					finish();
+				}
+			});
 		}
 
 		function reportDiagnostic(event, details = {}) {
@@ -2127,8 +2172,10 @@
 			const report = {
 				event,
 				message:details.message || '',
+				nativeMessage:details.nativeMessage,
 				path:details.path || '',
 				deviceToken:diagnosticDeviceToken,
+				studentName:diagnosticStudentName || undefined,
 				sessionContext:{
 					role:isStudentCheckinPage ? 'student' : 'instructor',
 					code:sessionCode || '',
@@ -2137,7 +2184,7 @@
 					startedAt:sessionStartedAt || urlParams.get('sessionStartedAt') || '',
 					expiresAt:sessionExpiresAt || '',
 					active:sessionActive,
-					locationAvailable:!!classroomLocation
+					classroomLocationAvailable:!!classroomLocation
 				},
 				action:details.action || event,
 				field:details.field,
@@ -2150,7 +2197,13 @@
 				browser:navigator.userAgent,
 				secureContext:window.isSecureContext,
 				geolocation:'geolocation' in navigator,
-				locationAvailable:!!classroomLocation
+				classroomLocationAvailable:!!classroomLocation,
+				permissionState:details.permissionState,
+				errorName:details.errorName,
+				errorCode:details.errorCode,
+				visibilityState:details.visibilityState,
+				userActivation:details.userActivation,
+				permissionsApi:details.permissionsApi
 			};
 
 			void fetch(`${API_BASE_URL}/api/device-diagnostics`, {
@@ -2220,6 +2273,48 @@
 				let watchId = null;
 				let finished = false;
 				let invalidPositionReported = false;
+				let permissionState = 'unknown';
+
+				if (navigator.permissions?.query) {
+					navigator.permissions.query({ name:'geolocation' })
+						.then(permission => {
+							permissionState = permission.state;
+							reportDiagnostic('geolocation_permission_state', {
+								permissionState,
+								permissionsApi:true
+							});
+							const onPermissionChange = () => {
+								permissionState = permission.state;
+								reportDiagnostic('geolocation_permission_changed', {
+									permissionState,
+									permissionsApi:true
+								});
+							};
+							if (permission.addEventListener) {
+								permission.addEventListener('change', onPermissionChange);
+							} else {
+								permission.onchange = onPermissionChange;
+							}
+						})
+						.catch(error => {
+							reportDiagnostic('geolocation_permission_query_failed', {
+								permissionsApi:true,
+								errorName:error.name,
+								message:error.message
+							});
+						});
+				} else {
+					reportDiagnostic('geolocation_permissions_api_unavailable', {
+						permissionsApi:false
+					});
+				}
+
+				reportDiagnostic('geolocation_request_started', {
+					permissionState,
+					permissionsApi:!!navigator.permissions?.query,
+					visibilityState:document.visibilityState,
+					userActivation:navigator.userActivation?.isActive
+				});
 
 				const finish = (position, error = null) => {
 					if (finished) return;
@@ -2234,7 +2329,8 @@
 					if (position) {
 						reportDiagnostic('location_lookup_succeeded', {
 							locationAccuracy:Number(position.coords.accuracy),
-							requiredAccuracy:minimumAccuracy
+							requiredAccuracy:minimumAccuracy,
+							permissionState
 						});
 						resolve(position);
 					} else {
@@ -2246,7 +2342,14 @@
 								: 'location_timeout';
 						reportDiagnostic(event, {
 							message:error?.message || 'Location lookup failed.',
-							status:locationCode
+							nativeMessage:error?.nativeMessage,
+							status:locationCode,
+							errorCode:locationCode,
+							errorName:error?.name,
+							permissionState,
+							permissionsApi:!!navigator.permissions?.query,
+							visibilityState:document.visibilityState,
+							userActivation:navigator.userActivation?.isActive
 						});
 						reject(error || new Error('Unable to determine your location.'));
 					}
@@ -2284,6 +2387,8 @@
 					};
 					const locationError = new Error(messages[error.code] || 'Unable to determine location.');
 					locationError.locationCode = error.code;
+					locationError.name = error.name || 'GeolocationPositionError';
+					locationError.nativeMessage = error.message || '';
 					locationError.locationAccessFailure = true;
 					finish(null, locationError);
 				};
@@ -2310,6 +2415,8 @@
 					);
 				} catch (error) {
 					const locationError = new Error(error.message || 'Location access failed.');
+					locationError.name = error.name || 'GeolocationRequestError';
+					locationError.nativeMessage = error.message || '';
 					locationError.locationAccessFailure = true;
 					finish(null, locationError);
 				}
@@ -3241,20 +3348,18 @@
 					$('start-session');
 
 				button.disabled = true;
+				sessionActive = false;
+				serverSession = false;
+				sessionCode = '';
+				sessionStartedAt = null;
+				sessionExpiresAt = null;
+				sessionClientStartedAt = null;
+				makeQr();
+				setCountdownText(0);
+				updateSessionStatus();
+				updateSessionControls();
 				SESSION_DURATION_SECONDS = Number($('session-duration').value) * 60;
 				const durationMinutes = SESSION_DURATION_SECONDS / 60;
-
-				sessionClientStartedAt =
-					new Date().toISOString();
-
-				sessionStartedAt =
-					sessionClientStartedAt;
-
-				sessionExpiresAt =
-					new Date(
-						Date.now() +
-						SESSION_DURATION_SECONDS * 1000
-					).toISOString();
 
 				instructorTimeZone =
 					Intl.DateTimeFormat()
@@ -3262,73 +3367,6 @@
 						.timeZone ||
 					APP_TIME_ZONE;
 
-				const startServerSession =
-					async () => {
-						try {
-							const session =
-								await apiRequest(
-									'/api/sessions',
-									{
-										method:'POST',
-										body:JSON.stringify({
-											className:
-												$('class-name').value,
-											room:
-												$('room-name').value,
-											radius:
-												$('radius').value,
-										durationMinutes,
-											roster,
-											requireRosterMatch,
-											clientStartedAt:
-												sessionClientStartedAt,
-											instructorTimeZone,
-											latitude:
-												classroomLocation.latitude,
-											longitude:
-												classroomLocation.longitude
-										})
-									}
-								);
-
-							applySession(
-								session
-							);
-
-							history.replaceState(
-								null,
-								'',
-								location.pathname
-							);
-
-							startServerPolling();
-
-							toast(
-								'New attendance session started'
-							);
-						} catch (error) {
-							/*
-							 * If creation failed, don't leave the
-							 * UI looking like a live session.
-							 */
-							serverSession = false;
-							sessionActive = false;
-							sessionCode = '';
-							sessionStartedAt = null;
-							sessionExpiresAt = null;
-
-							updateSessionStatus();
-							updateSessionControls();
-							updateSessionDetails();
-							setCountdownText(0);
-
-							toast(
-								error.message
-							);
-						} finally {
-							button.disabled = false;
-						}
-					};
 
 				/*
 				 * Capture the instructor location once, at the exact
@@ -3337,6 +3375,9 @@
 				 * a location, the session is not created.
 				 */
 				try {
+					button.innerHTML = '<i data-lucide="loader-circle" style="width:14px;vertical-align:-3px"></i> Getting classroom location…';
+					lucide.createIcons();
+
 					const position = await getBestCurrentPosition({
 						timeout:20000,
 						minimumAccuracy:35
@@ -3354,13 +3395,46 @@
 					classroomLocationAccuracy = accuracy;
 					classroomLocationSource = 'instructor';
 
-					await startServerSession();
+					button.innerHTML = '<i data-lucide="loader-circle" style="width:14px;vertical-align:-3px"></i> Creating session…';
+					lucide.createIcons();
+					const pendingSession = await apiRequest(
+						'/api/sessions',
+						{
+							method:'POST',
+							body:JSON.stringify({
+								className:$('class-name').value,
+								room:$('room-name').value,
+								radius:$('radius').value,
+								durationMinutes,
+								roster,
+								requireRosterMatch,
+								instructorTimeZone,
+								latitude:classroomLocation.latitude,
+								longitude:classroomLocation.longitude
+							})
+						}
+					);
+
+					button.innerHTML = '<i data-lucide="loader-circle" style="width:14px;vertical-align:-3px"></i> Loading official QR…';
+					lucide.createIcons();
+					await preloadOfficialQr(pendingSession.code);
+
+					button.innerHTML = '<i data-lucide="loader-circle" style="width:14px;vertical-align:-3px"></i> Starting timer…';
+					lucide.createIcons();
+					const session = await apiRequest(
+						`/api/sessions/${encodeURIComponent(pendingSession.code)}/activate`,
+						{ method:'POST' }
+					);
+
+					applySession(session);
+					history.replaceState(null, '', location.pathname);
+					startServerPolling();
+					toast('New attendance session started');
 
 					if (accuracy > 50) {
 						toast(`New attendance session started · GPS accuracy ±${Math.round(accuracy)} m`);
 					}
 				} catch (error) {
-					button.disabled = false;
 					serverSession = false;
 					sessionActive = false;
 					sessionCode = '';
@@ -3372,8 +3446,13 @@
 					updateSessionStatus();
 					updateSessionControls();
 					updateSessionDetails();
+					makeQr();
 					setCountdownText(0);
 					toast(error.message);
+				} finally {
+					button.disabled = false;
+					button.innerHTML = '<i data-lucide="play" style="width:14px;vertical-align:-3px"></i> Start attendance session';
+					lucide.createIcons();
 				}
 			}
 		);
@@ -3413,6 +3492,7 @@
 
 					cacheAttendanceSession();
 
+					makeQr();
 					updateSessionStatus();
 					updateSessionControls();
 					updateCountdown();
@@ -3456,6 +3536,7 @@
 						.value
 						.trim();
 
+				diagnosticStudentName = name;
 				reportDiagnostic('checkin_submit_attempted', {
 					field:'student-name',
 					inputType:'text',
@@ -3666,7 +3747,10 @@
 						}
 
 						reportDiagnostic('checkin_location_unavailable_submitting_flagged', {
-							message:error.message
+							message:error.message,
+							nativeMessage:error.nativeMessage,
+							errorName:error.name,
+							errorCode:error.locationCode
 						});
 						await submitCheckin(null, true);
 						return;
@@ -3889,11 +3973,14 @@
 						const lastSeen = device.lastSeen
 							? new Date(device.lastSeen).toLocaleString()
 							: 'Unknown last activity';
+						const deviceLabel = device.studentName
+							? escapeHtml(device.studentName)
+							: `Unidentified device ${index + 1}`;
 						return `
 							<button class="dev-log-device${device.deviceId === selectedDevLogDeviceId ? ' selected' : ''}" type="button" data-device-id="${escapeHtml(device.deviceId)}">
 								<span>
-									<strong>Device ${index + 1} · ${escapeHtml(details)}</strong>
-									<small>${escapeHtml(lastSeen)} · ID ${escapeHtml(device.deviceId)}</small>
+									<strong>${deviceLabel} · ${escapeHtml(details)}</strong>
+									<small>${escapeHtml(lastSeen)} · Device ID ${escapeHtml(device.deviceId)}</small>
 								</span>
 								<span class="dev-log-device-count">${Number(device.entries) || 0} events</span>
 							</button>
